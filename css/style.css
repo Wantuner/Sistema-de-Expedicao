@@ -1,0 +1,294 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI", sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0d47a1, #1976d2);
+  padding: 20px;
+  color: #fff;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(14px);
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+
+.container {
+  max-width: 1000px;
+  margin: auto;
+  padding: 25px;
+}
+
+.titulo,
+h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.subtitulo {
+  text-align: center;
+  margin: -6px auto 24px;
+  max-width: 720px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.formulario {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  padding: 20px;
+}
+
+input,
+select {
+  padding: 14px;
+  border-radius: 14px;
+  border: none;
+  outline: none;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+input::placeholder {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.botoes {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.btn {
+  position: relative;
+  overflow: hidden;
+  padding: 12px 22px;
+  border-radius: 14px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.btn::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -120%;
+  width: 50%;
+  height: 200%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transform: skewX(-20deg);
+  animation: luzBotao 3s linear infinite;
+}
+
+.btn:hover::after {
+  animation-play-state: paused;
+}
+
+.primary {
+  background: #1e88e5;
+  color: #fff;
+}
+
+.secondary {
+  background: #43a047;
+  color: #fff;
+}
+
+.warning {
+  background: #fbc02d;
+  color: #333;
+}
+
+.lista {
+  margin-top: 35px;
+}
+
+.grid-notas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
+
+.estado-vazio {
+  padding: 24px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.nota-card {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  padding: 18px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nota-card strong {
+  font-size: 16px;
+}
+
+.nota-card .valor {
+  margin-top: auto;
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.tempo-expedicao {
+  align-self: flex-end;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.nota-acoes {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+}
+
+.nota-acoes button {
+  background: rgba(255, 255, 255, 0.25);
+  border: none;
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  color: #fff;
+}
+
+.nota-card.expedido {
+  background: rgba(76, 175, 80, 0.08);
+  border-left: 6px solid #4caf50;
+}
+
+.nota-card.expedido::before {
+  content: "EXPEDIDO";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(76, 175, 80, 0.15);
+  color: #2e7d32;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+}
+
+.nota-card.expedido .tempo-expedicao {
+  background: rgba(76, 175, 80, 0.12);
+  border-color: rgba(76, 175, 80, 0.35);
+  color: #2e7d32;
+}
+
+.btn-expedir {
+  background: #e8f5e9;
+  border: 1px solid #c8e6c9;
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.nota-card.expedido .btn-expedir {
+  background: #4caf50;
+  color: #fff;
+}
+
+#toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 14px 20px;
+  border-radius: 14px;
+  opacity: 0;
+  transition: 0.4s;
+  z-index: 9999;
+}
+
+#toast.show {
+  opacity: 1;
+}
+
+#toast.sucesso {
+  background: #2e7d32;
+}
+
+#toast.aviso {
+  background: #f9a825;
+}
+
+#toast.erro {
+  background: #c62828;
+}
+
+select {
+  background: rgba(30, 136, 229, 0.85);
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+select option {
+  background-color: #1565c0;
+  color: #ffffff;
+}
+
+select option[value=""] {
+  color: #bbdefb;
+}
+
+select:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+}
+
+.titulo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.icone-titulo {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.4));
+}
+
+@keyframes luzBotao {
+  from {
+    left: -120%;
+  }
+
+  to {
+    left: 120%;
+  }
+}
+
+@media (max-width: 600px) {
+  .botoes {
+    flex-direction: column;
+  }
+}

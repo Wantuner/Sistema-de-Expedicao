@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Painel de Expedição</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="assets/favicon.ico" type="image/ico">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="vendor/jspdf.umd.min.js"></script>
+  <script src="vendor/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <main class="container glass">
+    <h1 class="titulo">
+      <img src="./assets/icone-rolimec.png" alt="Ícone" class="icone-titulo">
+      Painel de Expedição
+    </h1>
+
+    <p class="subtitulo">
+      Base frontend local para refatoração. Os dados ficam salvos apenas neste navegador.
+    </p>
+
+    <section class="formulario glass">
+      <input id="cliente" placeholder="Nome do Cliente">
+      <input id="nf" placeholder="Nota Fiscal">
+      <input id="pedido" placeholder="Número do Pedido">
+      <input id="volumes" type="number" placeholder="Volumes">
+      <input id="valor" type="number" placeholder="Valor da Nota">
+
+      <select id="caixa">
+        <option value="">Tamanho da Caixa</option>
+        <option>PP</option>
+        <option>P</option>
+        <option>M</option>
+        <option>G</option>
+        <option>GG</option>
+      </select>
+
+      <div class="botoes">
+        <button id="btnLimpar" class="btn warning">Limpar</button>
+        <button id="btnAdicionar" class="btn secondary">Adicionar</button>
+        <button id="btnPDF" class="btn primary">Gerar PDF</button>
+      </div>
+    </section>
+
+    <section class="lista">
+      <h2>Notas adicionadas</h2>
+      <div id="listaNotas" class="grid-notas"></div>
+    </section>
+  </main>
+
+  <div id="toast"></div>
+  <script src="js/script.js"></script>
+</body>
+</html>
