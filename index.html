@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Painel de Expedição</title>
+  <title>Central de Expedição</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" href="assets/favicon.ico" type="image/ico">
   <link rel="stylesheet" href="css/style.css">
@@ -10,46 +10,177 @@
   <script src="vendor/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
-  <main class="container glass">
-    <h1 class="titulo">
-      <img src="./assets/icone-rolimec.png" alt="Ícone" class="icone-titulo">
-      Painel de Expedição
-    </h1>
-
-    <p class="subtitulo">
-      Base frontend local para refatoração. Os dados ficam salvos apenas neste navegador.
-    </p>
-
-    <section class="formulario glass">
-      <input id="cliente" placeholder="Nome do Cliente">
-      <input id="nf" placeholder="Nota Fiscal">
-      <input id="pedido" placeholder="Número do Pedido">
-      <input id="volumes" type="number" placeholder="Volumes">
-      <input id="valor" type="number" placeholder="Valor da Nota">
-
-      <select id="caixa">
-        <option value="">Tamanho da Caixa</option>
-        <option>PP</option>
-        <option>P</option>
-        <option>M</option>
-        <option>G</option>
-        <option>GG</option>
-      </select>
-
-      <div class="botoes">
-        <button id="btnLimpar" class="btn warning">Limpar</button>
-        <button id="btnAdicionar" class="btn secondary">Adicionar</button>
-        <button id="btnPDF" class="btn primary">Gerar PDF</button>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">
+          <img src="./assets/icone-rolimec.png" alt="Logo do sistema">
+        </div>
+        <div>
+          <strong>Expedição</strong>
+          <span>Nova base operacional</span>
+        </div>
       </div>
-    </section>
 
-    <section class="lista">
-      <h2>Notas adicionadas</h2>
-      <div id="listaNotas" class="grid-notas"></div>
-    </section>
-  </main>
+      <nav class="side-nav" aria-label="Seções principais">
+        <button class="nav-item active" type="button">Painel geral</button>
+        <button class="nav-item" type="button">Pedidos do dia</button>
+        <button class="nav-item" type="button">Separação</button>
+        <button class="nav-item" type="button">Expedições</button>
+        <button class="nav-item" type="button">Ocorrências</button>
+        <button class="nav-item" type="button">Relatórios</button>
+        <button class="nav-item" type="button">Configurações</button>
+      </nav>
 
-  <div id="toast"></div>
+      <section class="side-note">
+        <p>Base visual inspirada na sua referência e adaptada para a rotina de expedição.</p>
+      </section>
+    </aside>
+
+    <main class="workspace">
+      <header class="hero-panel">
+        <div>
+          <p class="eyebrow">Operação do dia</p>
+          <h1>Central de Expedição</h1>
+          <p class="hero-copy">
+            Cadastre notas, acompanhe o status do envio e use esta base como ponto de partida da refatoração.
+          </p>
+        </div>
+
+        <div class="hero-actions">
+          <button id="btnAdicionarTopo" class="hero-button hero-button-primary" type="button">Nova nota</button>
+          <button id="btnPDFTopo" class="hero-button" type="button">Exportar PDF</button>
+        </div>
+      </header>
+
+      <section class="summary-grid" aria-label="Resumo operacional">
+        <article class="summary-card">
+          <span class="summary-label">Total de registros</span>
+          <strong id="totalNotas">0</strong>
+          <small>Base local do navegador</small>
+        </article>
+
+        <article class="summary-card">
+          <span class="summary-label">Aguardando expedição</span>
+          <strong id="totalPendentes">0</strong>
+          <small>Prontos para ação da equipe</small>
+        </article>
+
+        <article class="summary-card">
+          <span class="summary-label">Expedidos</span>
+          <strong id="totalExpedidos">0</strong>
+          <small>Pedidos concluídos</small>
+        </article>
+
+        <article class="summary-card summary-card-highlight">
+          <span class="summary-label">Valor total em carteira</span>
+          <strong id="valorTotal">R$ 0,00</strong>
+          <small>Somatório dos registros atuais</small>
+        </article>
+      </section>
+
+      <section class="content-grid">
+        <section class="panel panel-form">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Cadastro rápido</p>
+              <h2>Novo lançamento</h2>
+            </div>
+            <span class="panel-chip">Frontend local</span>
+          </div>
+
+          <form class="formulario" id="formExpedicao">
+            <label class="field">
+              <span>Cliente</span>
+              <input id="cliente" placeholder="Nome do cliente">
+            </label>
+
+            <label class="field">
+              <span>Nota fiscal</span>
+              <input id="nf" placeholder="Ex.: 100245">
+            </label>
+
+            <label class="field">
+              <span>Pedido</span>
+              <input id="pedido" placeholder="Ex.: PED-2045">
+            </label>
+
+            <label class="field">
+              <span>Volumes</span>
+              <input id="volumes" type="number" min="1" placeholder="Quantidade">
+            </label>
+
+            <label class="field">
+              <span>Valor</span>
+              <input id="valor" type="number" min="0" step="0.01" placeholder="Valor da nota">
+            </label>
+
+            <label class="field">
+              <span>Caixa</span>
+              <select id="caixa">
+                <option value="">Selecione</option>
+                <option>PP</option>
+                <option>P</option>
+                <option>M</option>
+                <option>G</option>
+                <option>GG</option>
+              </select>
+            </label>
+
+            <div class="form-actions">
+              <button id="btnLimpar" class="btn btn-muted" type="button">Limpar</button>
+              <button id="btnAdicionar" class="btn btn-primary" type="button">Salvar registro</button>
+              <button id="btnPDF" class="btn btn-secondary" type="button">Gerar PDF</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel panel-table">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Monitoramento</p>
+              <h2>Fila de expedição</h2>
+            </div>
+            <span id="contadorFiltrado" class="panel-chip">0 registros</span>
+          </div>
+
+          <div class="toolbar">
+            <label class="search-box">
+              <span class="sr-only">Buscar por cliente, nota ou pedido</span>
+              <input id="buscaNotas" type="search" placeholder="Buscar cliente, NF ou pedido">
+            </label>
+
+            <select id="filtroStatus" class="status-filter">
+              <option value="todos">Todos os status</option>
+              <option value="pendente">Somente pendentes</option>
+              <option value="expedido">Somente expedidos</option>
+            </select>
+          </div>
+
+          <div class="table-wrap">
+            <table class="notas-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>NF</th>
+                  <th>Pedido</th>
+                  <th>Volumes</th>
+                  <th>Caixa</th>
+                  <th>Valor</th>
+                  <th>Status</th>
+                  <th>Dias</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="listaNotas"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" aria-live="polite"></div>
   <script src="js/script.js"></script>
 </body>
 </html>
