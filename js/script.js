@@ -6,10 +6,11 @@ const valor = document.getElementById("valor");
 const caixa = document.getElementById("caixa");
 
 const btnAdicionar = document.getElementById("btnAdicionar");
-const btnAdicionarTopo = document.getElementById("btnAdicionarTopo");
 const btnLimpar = document.getElementById("btnLimpar");
 const btnPDF = document.getElementById("btnPDF");
-const btnPDFTopo = document.getElementById("btnPDFTopo");
+const btnSair = document.getElementById("btnSair");
+const btnToggleSidebar = document.getElementById("btnToggleSidebar");
+const btnToggleSidebarFloating = document.getElementById("btnToggleSidebarFloating");
 
 const buscaNotas = document.getElementById("buscaNotas");
 const filtroStatus = document.getElementById("filtroStatus");
@@ -22,11 +23,139 @@ const totalExpedidos = document.getElementById("totalExpedidos");
 const valorTotal = document.getElementById("valorTotal");
 
 const toast = document.getElementById("toast");
+const quantidadeMenu = document.getElementById("quantidadeMenu");
+const quantidadeMenuTitulo = document.getElementById("quantidadeMenuTitulo");
+const quantidadeCustomizada = document.getElementById("quantidadeCustomizada");
+const btnAplicarQuantidade = document.getElementById("btnAplicarQuantidade");
 
 const STORAGE_KEY = "expedicao.notas";
+const SIDEBAR_STATE_KEY = "expedicao.sidebarCollapsed";
 
 let notas = [];
 let editId = null;
+let chipCaixaAtivo = null;
+
+function obterCaixasSelecionadas() {
+  return Array.from(document.querySelectorAll('input[name="caixa"]:checked')).map((input) => {
+    const quantidadeInput = input.parentElement.querySelector(".caixa-quantidade");
+    const quantidade = Math.max(1, Number(quantidadeInput?.value) || 1);
+
+    return {
+      tipo: input.value,
+      quantidade
+    };
+  });
+}
+
+function definirCaixasSelecionadas(caixasSelecionadas) {
+  const caixasNormalizadas = normalizarCaixas(caixasSelecionadas);
+
+  document.querySelectorAll('input[name="caixa"]').forEach((input) => {
+    const quantidadeInput = input.parentElement.querySelector(".caixa-quantidade");
+    const caixaEncontrada = caixasNormalizadas.find((item) => item.tipo === input.value);
+
+    input.checked = Boolean(caixaEncontrada);
+
+    if (quantidadeInput) {
+      quantidadeInput.value = caixaEncontrada ? caixaEncontrada.quantidade : 1;
+    }
+  });
+}
+
+function formatarCaixas(caixasSelecionadas) {
+  return normalizarCaixas(caixasSelecionadas)
+    .map((item) => `${item.quantidade}x ${item.tipo}`)
+    .join(", ");
+}
+
+function somarQuantidadeCaixas(caixasSelecionadas) {
+  return normalizarCaixas(caixasSelecionadas).reduce((total, item) => {
+    return total + item.quantidade;
+  }, 0);
+}
+
+function ajustarCaixasParaVolumes(caixasSelecionadas, volumes) {
+  const caixasNormalizadas = normalizarCaixas(caixasSelecionadas);
+
+  if (caixasNormalizadas.length === 1) {
+    return [{
+      tipo: caixasNormalizadas[0].tipo,
+      quantidade: volumes
+    }];
+  }
+
+  return caixasNormalizadas;
+}
+
+function fecharMenuQuantidade() {
+  chipCaixaAtivo = null;
+  quantidadeMenu.hidden = true;
+}
+
+function posicionarMenuQuantidade() {
+  const margem = 12;
+  quantidadeMenu.hidden = false;
+
+  const largura = quantidadeMenu.offsetWidth;
+  const altura = quantidadeMenu.offsetHeight;
+  const leftPreferido = 395;
+  const topPreferido = 395;
+
+  const left = Math.max(margem, Math.min(leftPreferido, window.innerWidth - largura - margem));
+  const top = Math.max(margem, Math.min(topPreferido, window.innerHeight - altura - margem));
+
+  quantidadeMenu.style.left = `${left}px`;
+  quantidadeMenu.style.top = `${top}px`;
+}
+
+function aplicarQuantidadeAoChip(quantidade) {
+  if (!chipCaixaAtivo) return;
+
+  const checkbox = chipCaixaAtivo.querySelector('input[type="checkbox"]');
+  const campoQuantidade = chipCaixaAtivo.querySelector(".caixa-quantidade");
+  const quantidadeFinal = Math.max(1, Number(quantidade) || 1);
+
+  checkbox.checked = true;
+  campoQuantidade.value = quantidadeFinal;
+  fecharMenuQuantidade();
+}
+
+function abrirMenuQuantidade(evento, chip) {
+  evento.preventDefault();
+
+  chipCaixaAtivo = chip;
+  const checkbox = chip.querySelector('input[type="checkbox"]');
+  const campoQuantidade = chip.querySelector(".caixa-quantidade");
+  const tipo = checkbox.value;
+  const quantidadeAtual = Math.max(1, Number(campoQuantidade.value) || 1);
+
+  quantidadeMenuTitulo.textContent = `Quantidade de caixas ${tipo}`;
+  quantidadeCustomizada.value = quantidadeAtual;
+  posicionarMenuQuantidade();
+}
+
+function normalizarCaixas(caixasSelecionadas) {
+  if (!Array.isArray(caixasSelecionadas)) {
+    return String(caixasSelecionadas || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((tipo) => ({ tipo, quantidade: 1 }));
+  }
+
+  return caixasSelecionadas
+    .map((item) => {
+      if (typeof item === "string") {
+        return { tipo: item, quantidade: 1 };
+      }
+
+      return {
+        tipo: String(item.tipo || "").trim(),
+        quantidade: Math.max(1, Number(item.quantidade) || 1)
+      };
+    })
+    .filter((item) => item.tipo);
+}
 
 function gerarId() {
   return Date.now() + Math.floor(Math.random() * 1000);
@@ -64,6 +193,31 @@ function mostrarToast(msg, tipo) {
   setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
+function aplicarEstadoSidebar(colapsado) {
+  document.body.classList.toggle("sidebar-collapsed", colapsado);
+
+  [btnToggleSidebar, btnToggleSidebarFloating].forEach((botao) => {
+    if (!botao) return;
+
+    botao.setAttribute("aria-expanded", String(!colapsado));
+    botao.setAttribute(
+      "aria-label",
+      colapsado ? "Exibir menu lateral" : "Ocultar menu lateral"
+    );
+  });
+}
+
+function alternarSidebar() {
+  const colapsado = !document.body.classList.contains("sidebar-collapsed");
+  aplicarEstadoSidebar(colapsado);
+  localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(colapsado));
+}
+
+function carregarEstadoSidebar() {
+  const estadoSalvo = localStorage.getItem(SIDEBAR_STATE_KEY);
+  aplicarEstadoSidebar(estadoSalvo ? JSON.parse(estadoSalvo) : false);
+}
+
 function salvarNotas() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(notas));
 }
@@ -88,7 +242,7 @@ function obterDadosFormulario() {
     pedido: pedido.value.trim(),
     volumes: Number(volumes.value),
     valor: Number(valor.value),
-    caixa: caixa.value
+    caixa: obterCaixasSelecionadas()
   };
 }
 
@@ -98,7 +252,7 @@ function limparFormulario() {
   pedido.value = "";
   volumes.value = "";
   valor.value = "";
-  caixa.value = "";
+  definirCaixasSelecionadas([]);
   editId = null;
 }
 
@@ -159,13 +313,13 @@ function render() {
       <td>
         <div class="cliente-cell">
           <strong>${nota.cliente}</strong>
-          <span>Lançado em ${formatarData(nota.created_at)}</span>
+          <span>Lancado em ${formatarData(nota.created_at)}</span>
         </div>
       </td>
       <td>${nota.nf}</td>
       <td>${nota.pedido}</td>
       <td>${nota.volumes}</td>
-      <td>${nota.caixa}</td>
+      <td>${formatarCaixas(nota.caixa)}</td>
       <td>${formatarMoeda(nota.valor)}</td>
       <td><span class="status-badge status-${status}">${statusTexto}</span></td>
       <td><span class="tempo-pill">${calcularDiasNaExpedicao(nota.created_at)}</span></td>
@@ -197,8 +351,15 @@ function carregarNotas() {
 function salvarRegistro() {
   const dados = obterDadosFormulario();
 
-  if (!dados.cliente || !dados.nf || !dados.pedido || !dados.volumes || !dados.valor || !dados.caixa) {
+  if (!dados.cliente || !dados.nf || !dados.pedido || !dados.volumes || !dados.valor || !dados.caixa.length) {
     mostrarToast("Preencha todos os campos.", "aviso");
+    return;
+  }
+
+  dados.caixa = ajustarCaixasParaVolumes(dados.caixa, dados.volumes);
+
+  if (somarQuantidadeCaixas(dados.caixa) !== dados.volumes) {
+    mostrarToast("A soma das caixas selecionadas precisa ser igual a quantidade informada em Volumes.", "erro");
     return;
   }
 
@@ -207,7 +368,7 @@ function salvarRegistro() {
   });
 
   if (duplicado) {
-    mostrarToast("Nota fiscal ou pedido já existente.", "erro");
+    mostrarToast("Nota fiscal ou pedido ja existente.", "erro");
     return;
   }
 
@@ -234,12 +395,47 @@ function salvarRegistro() {
 }
 
 btnAdicionar.addEventListener("click", salvarRegistro);
-btnAdicionarTopo.addEventListener("click", () => cliente.focus());
 btnLimpar.addEventListener("click", limparFormulario);
 btnPDF.addEventListener("click", gerarPDF);
-btnPDFTopo.addEventListener("click", gerarPDF);
+btnToggleSidebar.addEventListener("click", alternarSidebar);
+btnToggleSidebarFloating.addEventListener("click", alternarSidebar);
 buscaNotas.addEventListener("input", render);
 filtroStatus.addEventListener("change", render);
+btnSair.addEventListener("click", () => {
+  mostrarToast("Acao de saida reservada para a futura autenticacao.", "aviso");
+});
+
+document.querySelectorAll(".checkbox-chip").forEach((chip) => {
+  chip.addEventListener("contextmenu", (evento) => abrirMenuQuantidade(evento, chip));
+});
+
+document.querySelectorAll(".quantidade-opcao").forEach((botao) => {
+  botao.addEventListener("click", () => aplicarQuantidadeAoChip(botao.dataset.quantidade));
+});
+
+btnAplicarQuantidade.addEventListener("click", () => {
+  aplicarQuantidadeAoChip(quantidadeCustomizada.value);
+});
+
+quantidadeCustomizada.addEventListener("keydown", (evento) => {
+  if (evento.key === "Enter") {
+    evento.preventDefault();
+    aplicarQuantidadeAoChip(quantidadeCustomizada.value);
+  }
+});
+
+document.addEventListener("click", (evento) => {
+  if (quantidadeMenu.hidden) return;
+  if (quantidadeMenu.contains(evento.target)) return;
+
+  fecharMenuQuantidade();
+});
+
+document.addEventListener("keydown", (evento) => {
+  if (evento.key === "Escape") {
+    fecharMenuQuantidade();
+  }
+});
 
 window.editar = (id) => {
   const nota = notas.find((item) => item.id === id);
@@ -250,10 +446,10 @@ window.editar = (id) => {
   pedido.value = nota.pedido;
   volumes.value = nota.volumes;
   valor.value = nota.valor;
-  caixa.value = nota.caixa;
+  definirCaixasSelecionadas(nota.caixa);
   editId = id;
   cliente.focus();
-  mostrarToast("Registro carregado para edição.", "sucesso");
+  mostrarToast("Registro carregado para edicao.", "sucesso");
 };
 
 window.excluir = (id) => {
@@ -262,7 +458,7 @@ window.excluir = (id) => {
 
   notas = notas.filter((nota) => nota.id !== id);
   salvarNotas();
-  mostrarToast("Registro excluído.", "aviso");
+  mostrarToast("Registro excluido.", "aviso");
   carregarNotas();
 };
 
@@ -297,7 +493,7 @@ function gerarPDF() {
       nota.nf,
       nota.pedido,
       nota.volumes,
-      nota.caixa,
+      formatarCaixas(nota.caixa),
       formatarMoeda(nota.valor),
       nota.expedido ? "Expedido" : "Pendente"
     ])
@@ -306,4 +502,5 @@ function gerarPDF() {
   doc.save("relatorio-expedicao.pdf");
 }
 
+carregarEstadoSidebar();
 carregarNotas();

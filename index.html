@@ -11,12 +11,14 @@
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <div class="brand-mark">
-          <img src="./assets/icone-rolimec.png" alt="Logo do sistema">
-        </div>
-        <div>
+        <button class="brand-toggle" id="btnToggleSidebar" type="button" aria-expanded="true" aria-controls="sidebar" aria-label="Ocultar menu lateral">
+          <div class="brand-mark">
+            <img src="./assets/icone-rolimec.png" alt="Logo do sistema">
+          </div>
+        </button>
+        <div class="brand-copy">
           <strong>Expedição</strong>
           <span>Nova base operacional</span>
         </div>
@@ -39,17 +41,13 @@
 
     <main class="workspace">
       <header class="hero-panel">
-        <div>
-          <p class="eyebrow">Operação do dia</p>
-          <h1>Central de Expedição</h1>
-          <p class="hero-copy">
-            Cadastre notas, acompanhe o status do envio e use esta base como ponto de partida da refatoração.
-          </p>
-        </div>
+        <button class="sidebar-fab" id="btnToggleSidebarFloating" type="button" aria-expanded="true" aria-controls="sidebar" aria-label="Exibir menu lateral">
+          <img src="./assets/icone-rolimec.png" alt="Abrir menu lateral">
+        </button>
 
-        <div class="hero-actions">
-          <button id="btnAdicionarTopo" class="hero-button hero-button-primary" type="button">Nova nota</button>
-          <button id="btnPDFTopo" class="hero-button" type="button">Exportar PDF</button>
+        <div class="session-bar">
+          <span class="session-user" id="usuarioLogado">rolimec.ce</span>
+          <button class="session-exit" id="btnSair" type="button">Sair</button>
         </div>
       </header>
 
@@ -86,7 +84,6 @@
               <p class="eyebrow">Cadastro rápido</p>
               <h2>Novo lançamento</h2>
             </div>
-            <span class="panel-chip">Frontend local</span>
           </div>
 
           <form class="formulario" id="formExpedicao">
@@ -117,19 +114,38 @@
 
             <label class="field">
               <span>Caixa</span>
-              <select id="caixa">
-                <option value="">Selecione</option>
-                <option>PP</option>
-                <option>P</option>
-                <option>M</option>
-                <option>G</option>
-                <option>GG</option>
-              </select>
+              <div class="checkbox-group" id="caixa">
+                <label class="checkbox-chip">
+                  <input type="checkbox" name="caixa" value="PP">
+                  <span>PP</span>
+                  <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas PP">
+                </label>
+                <label class="checkbox-chip">
+                  <input type="checkbox" name="caixa" value="P">
+                  <span>P</span>
+                  <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas P">
+                </label>
+                <label class="checkbox-chip">
+                  <input type="checkbox" name="caixa" value="M">
+                  <span>M</span>
+                  <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas M">
+                </label>
+                <label class="checkbox-chip">
+                  <input type="checkbox" name="caixa" value="G">
+                  <span>G</span>
+                  <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas G">
+                </label>
+                <label class="checkbox-chip">
+                  <input type="checkbox" name="caixa" value="GG">
+                  <span>GG</span>
+                  <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas GG">
+                </label>
+              </div>
             </label>
 
             <div class="form-actions">
               <button id="btnLimpar" class="btn btn-muted" type="button">Limpar</button>
-              <button id="btnAdicionar" class="btn btn-primary" type="button">Salvar registro</button>
+              <button id="btnAdicionar" class="btn btn-primary" type="button">Salvar</button>
               <button id="btnPDF" class="btn btn-secondary" type="button">Gerar PDF</button>
             </div>
           </form>
@@ -181,6 +197,23 @@
   </div>
 
   <div id="toast" aria-live="polite"></div>
+
+  <div class="quantidade-menu" id="quantidadeMenu" hidden>
+    <p class="quantidade-menu-titulo" id="quantidadeMenuTitulo">Quantidade</p>
+    <div class="quantidade-opcoes">
+      <button class="quantidade-opcao" type="button" data-quantidade="1">1x</button>
+      <button class="quantidade-opcao" type="button" data-quantidade="2">2x</button>
+      <button class="quantidade-opcao" type="button" data-quantidade="3">3x</button>
+      <button class="quantidade-opcao" type="button" data-quantidade="4">4x</button>
+      <button class="quantidade-opcao" type="button" data-quantidade="5">5x</button>
+      <button class="quantidade-opcao" type="button" data-quantidade="6">6x</button>
+    </div>
+    <div class="quantidade-customizada">
+      <input id="quantidadeCustomizada" type="number" min="1" value="1" aria-label="Quantidade personalizada">
+      <button id="btnAplicarQuantidade" type="button">Aplicar</button>
+    </div>
+  </div>
+
   <script src="js/script.js"></script>
 </body>
 </html>
