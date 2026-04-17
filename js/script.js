@@ -313,7 +313,7 @@ function render() {
       <td>
         <div class="cliente-cell">
           <strong>${nota.cliente}</strong>
-          <span>Lancado em ${formatarData(nota.created_at)}</span>
+          <span> ${formatarData(nota.created_at)}</span>
         </div>
       </td>
       <td>${nota.nf}</td>
