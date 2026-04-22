@@ -9,6 +9,7 @@ const btnAdicionar = document.getElementById("btnAdicionar");
 const btnLimpar = document.getElementById("btnLimpar");
 const btnPDF = document.getElementById("btnPDF");
 const btnSair = document.getElementById("btnSair");
+const btnToggleFormulario = document.getElementById("btnToggleFormulario");
 const btnToggleSidebar = document.getElementById("btnToggleSidebar");
 const btnToggleSidebarFloating = document.getElementById("btnToggleSidebarFloating");
 
@@ -30,6 +31,7 @@ const btnAplicarQuantidade = document.getElementById("btnAplicarQuantidade");
 
 const STORAGE_KEY = "expedicao.notas";
 const SIDEBAR_STATE_KEY = "expedicao.sidebarCollapsed";
+const FORM_STATE_KEY = "expedicao.formularioRetraido";
 
 let notas = [];
 let editId = null;
@@ -207,6 +209,18 @@ function aplicarEstadoSidebar(colapsado) {
   });
 }
 
+function aplicarEstadoFormulario(retraido) {
+  document.body.classList.toggle("formulario-retraido", retraido);
+
+  if (!btnToggleFormulario) return;
+
+  btnToggleFormulario.setAttribute("aria-expanded", String(!retraido));
+  btnToggleFormulario.setAttribute(
+    "aria-label",
+    retraido ? "Expandir formulário" : "Recolher formulário"
+  );
+}
+
 function alternarSidebar() {
   const colapsado = !document.body.classList.contains("sidebar-collapsed");
   aplicarEstadoSidebar(colapsado);
@@ -216,6 +230,17 @@ function alternarSidebar() {
 function carregarEstadoSidebar() {
   const estadoSalvo = localStorage.getItem(SIDEBAR_STATE_KEY);
   aplicarEstadoSidebar(estadoSalvo ? JSON.parse(estadoSalvo) : false);
+}
+
+function alternarFormulario() {
+  const retraido = !document.body.classList.contains("formulario-retraido");
+  aplicarEstadoFormulario(retraido);
+  localStorage.setItem(FORM_STATE_KEY, JSON.stringify(retraido));
+}
+
+function carregarEstadoFormulario() {
+  const estadoSalvo = localStorage.getItem(FORM_STATE_KEY);
+  aplicarEstadoFormulario(estadoSalvo ? JSON.parse(estadoSalvo) : false);
 }
 
 function salvarNotas() {
@@ -399,6 +424,7 @@ btnLimpar.addEventListener("click", limparFormulario);
 btnPDF.addEventListener("click", gerarPDF);
 btnToggleSidebar.addEventListener("click", alternarSidebar);
 btnToggleSidebarFloating.addEventListener("click", alternarSidebar);
+btnToggleFormulario.addEventListener("click", alternarFormulario);
 buscaNotas.addEventListener("input", render);
 filtroStatus.addEventListener("change", render);
 btnSair.addEventListener("click", () => {
@@ -503,4 +529,5 @@ function gerarPDF() {
 }
 
 carregarEstadoSidebar();
+carregarEstadoFormulario();
 carregarNotas();
