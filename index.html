@@ -25,173 +25,255 @@
       </div>
 
       <nav class="side-nav" aria-label="Seções principais">
-        <button class="nav-item active" type="button">Painel geral</button>
-        
-        
-        <button class="nav-item" type="button">Expedição</button>
-       
+        <button class="nav-item active" type="button" data-view="painel">Painel geral</button>
+        <button class="nav-item" type="button" data-view="cadastros">Área de Cadastro</button>
+        <button class="nav-item" type="button" data-view="expedicao">Expedição</button>
       </nav>
 
-      <section class="side-note">
-        <p>Navegação do software em desenvolvimento.</p>
+      <section class="sidebar-profile">
+        <div class="profile-card">
+          <div class="profile-avatar">R</div>
+          <div class="profile-copy">
+            <strong id="usuarioLogado">rolimec.ce</strong>
+            <span>Perfil operacional</span>
+          </div>
+        </div>
+        <button class="session-exit sidebar-exit" id="btnSair" type="button">Sair</button>
       </section>
     </aside>
 
     <main class="workspace">
-      <header class="hero-panel">
-        <button class="sidebar-fab" id="btnToggleSidebarFloating" type="button" aria-expanded="true" aria-controls="sidebar" aria-label="Exibir menu lateral">
-          <img src="./assets/icone-rolimec.png" alt="Abrir menu lateral">
-        </button>
+      <button class="sidebar-fab" id="btnToggleSidebarFloating" type="button" aria-expanded="true" aria-controls="sidebar" aria-label="Exibir menu lateral">
+        <img src="./assets/icone-rolimec.png" alt="Abrir menu lateral">
+      </button>
 
-        <div class="session-bar">
-          <span class="session-user" id="usuarioLogado">rolimec.ce</span>
-          <button class="session-exit" id="btnSair" type="button">Sair</button>
-        </div>
-      </header>
+      <section class="view-section is-active" id="view-painel">
+        <section class="summary-grid" aria-label="Resumo operacional">
+          <article class="summary-card">
+            <span class="summary-label">Total de registros</span>
+            <strong id="totalNotas">0</strong>
+            <small>Base local do navegador</small>
+          </article>
 
-      <section class="summary-grid" aria-label="Resumo operacional">
-        <article class="summary-card">
-          <span class="summary-label">Total de registros</span>
-          <strong id="totalNotas">0</strong>
-          <small>Base local do navegador</small>
-        </article>
+          <article class="summary-card">
+            <span class="summary-label">Aguardando expedição</span>
+            <strong id="totalPendentes">0</strong>
+            <small>Prontos para ação da equipe</small>
+          </article>
 
-        <article class="summary-card">
-          <span class="summary-label">Aguardando expedição</span>
-          <strong id="totalPendentes">0</strong>
-          <small>Prontos para ação da equipe</small>
-        </article>
+          <article class="summary-card">
+            <span class="summary-label">Expedidos</span>
+            <strong id="totalExpedidos">0</strong>
+            <small>Pedidos concluídos</small>
+          </article>
 
-        <article class="summary-card">
-          <span class="summary-label">Expedidos</span>
-          <strong id="totalExpedidos">0</strong>
-          <small>Pedidos concluídos</small>
-        </article>
-
-        <article class="summary-card summary-card-highlight">
-          <span class="summary-label">Valor total em carteira</span>
-          <strong id="valorTotal">R$ 0,00</strong>
-          <small>Somatório dos registros atuais</small>
-        </article>
-      </section>
-
-      <section class="content-grid">
-        <section class="panel panel-form">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Cadastro rápido</p>
-              <h2>Novo lançamento</h2>
-            </div>
-            <button class="panel-toggle" id="btnToggleFormulario" type="button" aria-expanded="true" aria-controls="formExpedicao" aria-label="Recolher formulário">
-              <span class="panel-toggle-icon" aria-hidden="true">⟨</span>
-            </button>
-          </div>
-
-          <form class="formulario" id="formExpedicao">
-            <label class="field">
-              <span>Cliente</span>
-              <input id="cliente" placeholder="Nome do cliente">
-            </label>
-
-            <label class="field">
-              <span>Nota fiscal</span>
-              <input id="nf" placeholder="Ex.: 100245">
-            </label>
-
-            <label class="field">
-              <span>Pedido</span>
-              <input id="pedido" placeholder="Ex.: PED-2045">
-            </label>
-
-            <label class="field">
-              <span>Volumes</span>
-              <input id="volumes" type="number" min="1" placeholder="Quantidade">
-            </label>
-
-            <label class="field">
-              <span>Valor</span>
-              <input id="valor" type="number" min="0" step="0.01" placeholder="Valor da nota">
-            </label>
-
-            <label class="field">
-              <span>Caixa</span>
-              <div class="checkbox-group" id="caixa">
-                <label class="checkbox-chip">
-                  <input type="checkbox" name="caixa" value="PP">
-                  <span>PP</span>
-                  <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas PP">
-                </label>
-                <label class="checkbox-chip">
-                  <input type="checkbox" name="caixa" value="P">
-                  <span>P</span>
-                  <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas P">
-                </label>
-                <label class="checkbox-chip">
-                  <input type="checkbox" name="caixa" value="M">
-                  <span>M</span>
-                  <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas M">
-                </label>
-                <label class="checkbox-chip">
-                  <input type="checkbox" name="caixa" value="G">
-                  <span>G</span>
-                  <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas G">
-                </label>
-                <label class="checkbox-chip">
-                  <input type="checkbox" name="caixa" value="GG">
-                  <span>GG</span>
-                  <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas GG">
-                </label>
-              </div>
-            </label>
-
-            <div class="form-actions">
-              <button id="btnLimpar" class="btn btn-muted" type="button">Limpar</button>
-              <button id="btnAdicionar" class="btn btn-primary" type="button">Salvar</button>
-              <button id="btnPDF" class="btn btn-secondary" type="button">Gerar PDF</button>
-            </div>
-          </form>
+          <article class="summary-card summary-card-highlight">
+            <span class="summary-label">Valor total em carteira</span>
+            <strong id="valorTotal">R$ 0,00</strong>
+            <small>Somatório dos registros atuais</small>
+          </article>
         </section>
 
-        <section class="panel panel-table">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Monitoramento</p>
-              <h2>Fila de expedição</h2>
+        <section class="content-grid">
+          <section class="panel panel-form">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Cadastro rápido</p>
+                <h2>Novo lançamento</h2>
+              </div>
+              <button class="panel-toggle" id="btnToggleFormulario" type="button" aria-expanded="true" aria-controls="formExpedicao" aria-label="Recolher formulário">
+                <span class="panel-toggle-icon" aria-hidden="true">⟨</span>
+              </button>
             </div>
-            <span id="contadorFiltrado" class="panel-chip">0 registros</span>
-          </div>
 
-          <div class="toolbar">
-            <label class="search-box">
-              <span class="sr-only">Buscar por cliente, nota ou pedido</span>
-              <input id="buscaNotas" type="search" placeholder="Buscar cliente, NF ou pedido">
-            </label>
+            <form class="formulario" id="formExpedicao">
+              <label class="field">
+                <span>Cliente</span>
+                <div class="combo-field" data-combo="cliente">
+                  <div class="input-com-icone">
+                    <input id="cliente" autocomplete="off" placeholder="Selecione ou digite um cliente">
+                    <button class="combo-trigger" type="button" data-combo-trigger="cliente" aria-label="Abrir opções de cliente"></button>
+                  </div>
+                  <div class="combo-menu" id="menuClientes" hidden></div>
+                </div>
+              </label>
 
-            <select id="filtroStatus" class="status-filter">
-              <option value="todos">Todos os status</option>
-              <option value="pendente">Somente pendentes</option>
-              <option value="expedido">Somente expedidos</option>
-            </select>
-          </div>
+              <label class="field">
+                <span>Transportadora</span>
+                <div class="combo-field" data-combo="transportadora">
+                  <div class="input-com-icone">
+                    <input id="transportadora" autocomplete="off" placeholder="Selecione ou digite uma transportadora">
+                    <button class="combo-trigger" type="button" data-combo-trigger="transportadora" aria-label="Abrir opções de transportadora"></button>
+                  </div>
+                  <div class="combo-menu" id="menuTransportadoras" hidden></div>
+                </div>
+              </label>
 
-          <div class="table-wrap">
-            <table class="notas-table">
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th>NF</th>
-                  <th>Pedido</th>
-                  <th>Volumes</th>
-                  <th>Caixa</th>
-                  <th>Valor</th>
-                  <th>Status</th>
-                  <th>Dias</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody id="listaNotas"></tbody>
-            </table>
+              <label class="field">
+                <span>Nota fiscal</span>
+                <input id="nf" placeholder="Ex.: 100245">
+              </label>
+
+              <label class="field">
+                <span>Pedido</span>
+                <input id="pedido" placeholder="Ex.: PED-2045">
+              </label>
+
+              <label class="field">
+                <span>Volumes</span>
+                <input id="volumes" type="number" min="1" placeholder="Quantidade">
+              </label>
+
+              <label class="field">
+                <span>Valor</span>
+                <input id="valor" type="number" min="0" step="0.01" placeholder="Valor da nota">
+              </label>
+
+              <label class="field">
+                <span>Caixa</span>
+                <div class="checkbox-group" id="caixa">
+                  <label class="checkbox-chip">
+                    <input type="checkbox" name="caixa" value="PP">
+                    <span>PP</span>
+                    <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas PP">
+                  </label>
+                  <label class="checkbox-chip">
+                    <input type="checkbox" name="caixa" value="P">
+                    <span>P</span>
+                    <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas P">
+                  </label>
+                  <label class="checkbox-chip">
+                    <input type="checkbox" name="caixa" value="M">
+                    <span>M</span>
+                    <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas M">
+                  </label>
+                  <label class="checkbox-chip">
+                    <input type="checkbox" name="caixa" value="G">
+                    <span>G</span>
+                    <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas G">
+                  </label>
+                  <label class="checkbox-chip">
+                    <input type="checkbox" name="caixa" value="GG">
+                    <span>GG</span>
+                    <input class="caixa-quantidade" type="number" min="1" value="1" aria-label="Quantidade de caixas GG">
+                  </label>
+                </div>
+              </label>
+
+              <div class="form-actions">
+                <button id="btnLimpar" class="btn btn-muted" type="button">Limpar</button>
+                <button id="btnAdicionar" class="btn btn-primary" type="button">Salvar</button>
+                <button id="btnPDF" class="btn btn-secondary" type="button">Gerar PDF</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="panel panel-table">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Monitoramento</p>
+                <h2>Fila de expedição</h2>
+              </div>
+              <span id="contadorFiltrado" class="panel-chip">0 registros</span>
+            </div>
+
+            <div class="toolbar">
+              <label class="search-box">
+                <span class="sr-only">Buscar por cliente, nota ou pedido</span>
+                <input id="buscaNotas" type="search" placeholder="Buscar cliente, NF ou pedido">
+              </label>
+
+              <select id="filtroStatus" class="status-filter">
+                <option value="todos">Todos os status</option>
+                <option value="pendente">Somente pendentes</option>
+                <option value="expedido">Somente expedidos</option>
+              </select>
+            </div>
+
+            <div class="table-wrap">
+              <table class="notas-table">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Transportadora</th>
+                    <th>NF</th>
+                    <th>Pedido</th>
+                    <th>Volumes</th>
+                    <th>Caixa</th>
+                    <th>Valor</th>
+                    <th>Status</th>
+                    <th>Dias</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="listaNotas"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+      </section>
+
+      <section class="view-section" id="view-cadastros">
+        <section class="panel cadastro-hero">
+          <div>
+            <p class="eyebrow">Base de apoio</p>
+            <h2>Área de Cadastro</h2>
+            <p class="hero-copy">
+              Cadastre clientes e transportadoras para usar essas opções diretamente em lançamentos.
+            </p>
           </div>
+        </section>
+
+        <section class="cadastro-grid">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Cadastro mestre</p>
+                <h2>Clientes</h2>
+              </div>
+              <span id="contadorClientes" class="panel-chip">0 clientes</span>
+            </div>
+
+            <form class="cadastro-form" id="formCliente">
+              <label class="field">
+                <span>Nome do cliente</span>
+                <input id="nomeClienteCadastro" placeholder="Ex.: Loja Central">
+              </label>
+              <button id="btnSalvarCliente" class="btn btn-primary" type="button">Salvar cliente</button>
+            </form>
+
+            <div class="cadastro-lista" id="listaClientes"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Cadastro mestre</p>
+                <h2>Transportadoras</h2>
+              </div>
+              <span id="contadorTransportadoras" class="panel-chip">0 transportadoras</span>
+            </div>
+
+            <form class="cadastro-form" id="formTransportadora">
+              <label class="field">
+                <span>Nome da transportadora</span>
+                <input id="nomeTransportadoraCadastro" placeholder="Ex.: Expresso Sul">
+              </label>
+              <button id="btnSalvarTransportadora" class="btn btn-primary" type="button">Salvar transportadora</button>
+            </form>
+
+            <div class="cadastro-lista" id="listaTransportadoras"></div>
+          </section>
+        </section>
+      </section>
+
+      <section class="view-section" id="view-expedicao">
+        <section class="panel placeholder-panel">
+          <p class="eyebrow">Próxima etapa</p>
+          <h2>Expedição</h2>
+          <p class="hero-copy">
+            Esta área fica reservada para as próximas telas operacionais do fluxo de expedição.
+          </p>
         </section>
       </section>
     </main>

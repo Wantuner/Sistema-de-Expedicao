@@ -1,9 +1,11 @@
 const cliente = document.getElementById("cliente");
+const transportadora = document.getElementById("transportadora");
+const menuClientes = document.getElementById("menuClientes");
+const menuTransportadoras = document.getElementById("menuTransportadoras");
 const nf = document.getElementById("nf");
 const pedido = document.getElementById("pedido");
 const volumes = document.getElementById("volumes");
 const valor = document.getElementById("valor");
-const caixa = document.getElementById("caixa");
 
 const btnAdicionar = document.getElementById("btnAdicionar");
 const btnLimpar = document.getElementById("btnLimpar");
@@ -12,11 +14,20 @@ const btnSair = document.getElementById("btnSair");
 const btnToggleFormulario = document.getElementById("btnToggleFormulario");
 const btnToggleSidebar = document.getElementById("btnToggleSidebar");
 const btnToggleSidebarFloating = document.getElementById("btnToggleSidebarFloating");
+const btnSalvarCliente = document.getElementById("btnSalvarCliente");
+const btnSalvarTransportadora = document.getElementById("btnSalvarTransportadora");
+
+const nomeClienteCadastro = document.getElementById("nomeClienteCadastro");
+const nomeTransportadoraCadastro = document.getElementById("nomeTransportadoraCadastro");
 
 const buscaNotas = document.getElementById("buscaNotas");
 const filtroStatus = document.getElementById("filtroStatus");
 const listaNotas = document.getElementById("listaNotas");
 const contadorFiltrado = document.getElementById("contadorFiltrado");
+const listaClientes = document.getElementById("listaClientes");
+const listaTransportadoras = document.getElementById("listaTransportadoras");
+const contadorClientes = document.getElementById("contadorClientes");
+const contadorTransportadoras = document.getElementById("contadorTransportadoras");
 
 const totalNotas = document.getElementById("totalNotas");
 const totalPendentes = document.getElementById("totalPendentes");
@@ -30,12 +41,39 @@ const quantidadeCustomizada = document.getElementById("quantidadeCustomizada");
 const btnAplicarQuantidade = document.getElementById("btnAplicarQuantidade");
 
 const STORAGE_KEY = "expedicao.notas";
+const CLIENTES_STORAGE_KEY = "expedicao.clientes";
+const TRANSPORTADORAS_STORAGE_KEY = "expedicao.transportadoras";
 const SIDEBAR_STATE_KEY = "expedicao.sidebarCollapsed";
 const FORM_STATE_KEY = "expedicao.formularioRetraido";
+const VIEW_STATE_KEY = "expedicao.viewAtual";
 
 let notas = [];
+let clientes = [];
+let transportadoras = [];
 let editId = null;
 let chipCaixaAtivo = null;
+let comboAberto = null;
+
+function gerarId() {
+  return Date.now() + Math.floor(Math.random() * 1000);
+}
+
+function lerListaStorage(chave) {
+  const valorSalvo = localStorage.getItem(chave);
+  if (!valorSalvo) return [];
+
+  try {
+    const dados = JSON.parse(valorSalvo);
+    return Array.isArray(dados) ? dados : [];
+  } catch (error) {
+    console.error(`Erro ao ler ${chave}:`, error);
+    return [];
+  }
+}
+
+function salvarListaStorage(chave, lista) {
+  localStorage.setItem(chave, JSON.stringify(lista));
+}
 
 function obterCaixasSelecionadas() {
   return Array.from(document.querySelectorAll('input[name="caixa"]:checked')).map((input) => {
@@ -47,6 +85,29 @@ function obterCaixasSelecionadas() {
       quantidade
     };
   });
+}
+
+function normalizarCaixas(caixasSelecionadas) {
+  if (!Array.isArray(caixasSelecionadas)) {
+    return String(caixasSelecionadas || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((tipo) => ({ tipo, quantidade: 1 }));
+  }
+
+  return caixasSelecionadas
+    .map((item) => {
+      if (typeof item === "string") {
+        return { tipo: item, quantidade: 1 };
+      }
+
+      return {
+        tipo: String(item.tipo || "").trim(),
+        quantidade: Math.max(1, Number(item.quantidade) || 1)
+      };
+    })
+    .filter((item) => item.tipo);
 }
 
 function definirCaixasSelecionadas(caixasSelecionadas) {
@@ -71,22 +132,111 @@ function formatarCaixas(caixasSelecionadas) {
 }
 
 function somarQuantidadeCaixas(caixasSelecionadas) {
-  return normalizarCaixas(caixasSelecionadas).reduce((total, item) => {
-    return total + item.quantidade;
-  }, 0);
+  return normalizarCaixas(caixasSelecionadas).reduce((total, item) => total + item.quantidade, 0);
 }
 
-function ajustarCaixasParaVolumes(caixasSelecionadas, volumes) {
+function ajustarCaixasParaVolumes(caixasSelecionadas, totalVolumes) {
   const caixasNormalizadas = normalizarCaixas(caixasSelecionadas);
 
   if (caixasNormalizadas.length === 1) {
     return [{
       tipo: caixasNormalizadas[0].tipo,
-      quantidade: volumes
+      quantidade: totalVolumes
     }];
   }
 
   return caixasNormalizadas;
+}
+
+function mostrarToast(msg, tipo) {
+  toast.textContent = msg;
+  toast.className = "";
+  toast.classList.add("show", tipo);
+  setTimeout(() => toast.classList.remove("show"), 3000);
+}
+
+function formatarMoeda(valorMonetario) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  }).format(Number(valorMonetario) || 0);
+}
+
+function formatarData(data) {
+  return new Date(data).toLocaleDateString("pt-BR");
+}
+
+function calcularDiasNaExpedicao(dataCriacao) {
+  const hoje = new Date();
+  const dataNota = new Date(dataCriacao);
+
+  const hojeZerado = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  const dataNotaZerada = new Date(dataNota.getFullYear(), dataNota.getMonth(), dataNota.getDate());
+  const diferencaMs = hojeZerado - dataNotaZerada;
+  const dias = Math.max(0, Math.floor(diferencaMs / 86400000));
+
+  if (dias === 0) return "Hoje";
+  if (dias === 1) return "1 dia";
+  return `${dias} dias`;
+}
+
+function aplicarEstadoSidebar(colapsado) {
+  document.body.classList.toggle("sidebar-collapsed", colapsado);
+
+  [btnToggleSidebar, btnToggleSidebarFloating].forEach((botao) => {
+    if (!botao) return;
+    botao.setAttribute("aria-expanded", String(!colapsado));
+    botao.setAttribute("aria-label", colapsado ? "Exibir menu lateral" : "Ocultar menu lateral");
+  });
+}
+
+function aplicarEstadoFormulario(retraido) {
+  document.body.classList.toggle("formulario-retraido", retraido);
+
+  if (!btnToggleFormulario) return;
+  btnToggleFormulario.setAttribute("aria-expanded", String(!retraido));
+  btnToggleFormulario.setAttribute("aria-label", retraido ? "Expandir formulário" : "Recolher formulário");
+}
+
+function aplicarView(view) {
+  const viewFinal = ["painel", "cadastros", "expedicao"].includes(view) ? view : "painel";
+
+  document.querySelectorAll(".view-section").forEach((section) => {
+    section.classList.toggle("is-active", section.id === `view-${viewFinal}`);
+  });
+
+  document.querySelectorAll(".nav-item").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === viewFinal);
+  });
+}
+
+function alternarSidebar() {
+  const colapsado = !document.body.classList.contains("sidebar-collapsed");
+  aplicarEstadoSidebar(colapsado);
+  localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(colapsado));
+}
+
+function alternarFormulario() {
+  const retraido = !document.body.classList.contains("formulario-retraido");
+  aplicarEstadoFormulario(retraido);
+  localStorage.setItem(FORM_STATE_KEY, JSON.stringify(retraido));
+}
+
+function carregarEstadoSidebar() {
+  aplicarEstadoSidebar(JSON.parse(localStorage.getItem(SIDEBAR_STATE_KEY) || "false"));
+}
+
+function carregarEstadoFormulario() {
+  aplicarEstadoFormulario(JSON.parse(localStorage.getItem(FORM_STATE_KEY) || "false"));
+}
+
+function carregarView() {
+  aplicarView(localStorage.getItem(VIEW_STATE_KEY) || "painel");
+}
+
+function navegarPara(view) {
+  aplicarView(view);
+  localStorage.setItem(VIEW_STATE_KEY, view);
 }
 
 function fecharMenuQuantidade() {
@@ -136,133 +286,172 @@ function abrirMenuQuantidade(evento, chip) {
   posicionarMenuQuantidade();
 }
 
-function normalizarCaixas(caixasSelecionadas) {
-  if (!Array.isArray(caixasSelecionadas)) {
-    return String(caixasSelecionadas || "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .map((tipo) => ({ tipo, quantidade: 1 }));
+function abrirCombo(tipo) {
+  comboAberto = tipo;
+  document.querySelectorAll(".combo-field").forEach((field) => {
+    field.classList.toggle("is-open", field.dataset.combo === tipo);
+  });
+  menuClientes.hidden = tipo !== "cliente";
+  menuTransportadoras.hidden = tipo !== "transportadora";
+}
+
+function fecharCombos() {
+  comboAberto = null;
+  document.querySelectorAll(".combo-field").forEach((field) => {
+    field.classList.remove("is-open");
+  });
+  menuClientes.hidden = true;
+  menuTransportadoras.hidden = true;
+}
+
+function filtrarItensCombo(items, termo) {
+  const busca = termo.trim().toLowerCase();
+  if (!busca) return items;
+  return items.filter((item) => item.toLowerCase().includes(busca));
+}
+
+function renderCombo(menu, items, tipo) {
+  const termo = tipo === "cliente" ? cliente.value : transportadora.value;
+  const itensFiltrados = filtrarItensCombo(items, termo);
+
+  menu.innerHTML = "";
+
+  if (!itensFiltrados.length) {
+    menu.innerHTML = `<div class="combo-empty">Nenhuma opção cadastrada encontrada.</div>`;
+    return;
   }
 
-  return caixasSelecionadas
-    .map((item) => {
-      if (typeof item === "string") {
-        return { tipo: item, quantidade: 1 };
+  itensFiltrados.forEach((item) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "combo-option";
+    button.textContent = item;
+    button.addEventListener("click", () => {
+      if (tipo === "cliente") {
+        cliente.value = item;
+      } else {
+        transportadora.value = item;
       }
-
-      return {
-        tipo: String(item.tipo || "").trim(),
-        quantidade: Math.max(1, Number(item.quantidade) || 1)
-      };
-    })
-    .filter((item) => item.tipo);
-}
-
-function gerarId() {
-  return Date.now() + Math.floor(Math.random() * 1000);
-}
-
-function formatarMoeda(valorMonetario) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL"
-  }).format(Number(valorMonetario) || 0);
-}
-
-function formatarData(data) {
-  return new Date(data).toLocaleDateString("pt-BR");
-}
-
-function calcularDiasNaExpedicao(dataCriacao) {
-  const hoje = new Date();
-  const dataNota = new Date(dataCriacao);
-
-  const hojeZerado = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-  const dataNotaZerada = new Date(dataNota.getFullYear(), dataNota.getMonth(), dataNota.getDate());
-  const diferencaMs = hojeZerado - dataNotaZerada;
-  const dias = Math.max(0, Math.floor(diferencaMs / 86400000));
-
-  if (dias === 0) return "Hoje";
-  if (dias === 1) return "1 dia";
-  return `${dias} dias`;
-}
-
-function mostrarToast(msg, tipo) {
-  toast.textContent = msg;
-  toast.className = "";
-  toast.classList.add("show", tipo);
-  setTimeout(() => toast.classList.remove("show"), 3000);
-}
-
-function aplicarEstadoSidebar(colapsado) {
-  document.body.classList.toggle("sidebar-collapsed", colapsado);
-
-  [btnToggleSidebar, btnToggleSidebarFloating].forEach((botao) => {
-    if (!botao) return;
-
-    botao.setAttribute("aria-expanded", String(!colapsado));
-    botao.setAttribute(
-      "aria-label",
-      colapsado ? "Exibir menu lateral" : "Ocultar menu lateral"
-    );
+      fecharCombos();
+    });
+    menu.appendChild(button);
   });
 }
 
-function aplicarEstadoFormulario(retraido) {
-  document.body.classList.toggle("formulario-retraido", retraido);
+function alternarCombo(tipo) {
+  if (comboAberto === tipo) {
+    fecharCombos();
+    return;
+  }
 
-  if (!btnToggleFormulario) return;
+  if (tipo === "cliente") {
+    renderCombo(menuClientes, clientes, "cliente");
+  } else {
+    renderCombo(menuTransportadoras, transportadoras, "transportadora");
+  }
 
-  btnToggleFormulario.setAttribute("aria-expanded", String(!retraido));
-  btnToggleFormulario.setAttribute(
-    "aria-label",
-    retraido ? "Expandir formulário" : "Recolher formulário"
-  );
+  abrirCombo(tipo);
 }
 
-function alternarSidebar() {
-  const colapsado = !document.body.classList.contains("sidebar-collapsed");
-  aplicarEstadoSidebar(colapsado);
-  localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(colapsado));
+function renderCadastros() {
+  contadorClientes.textContent = `${clientes.length} cliente${clientes.length === 1 ? "" : "s"}`;
+  contadorTransportadoras.textContent = `${transportadoras.length} transportadora${transportadoras.length === 1 ? "" : "s"}`;
+
+  listaClientes.innerHTML = clientes.length
+    ? clientes.map((item) => `
+        <div class="cadastro-item">
+          <strong>${item}</strong>
+          <button type="button" onclick="removerCliente('${item.replace(/'/g, "\\'")}')">Excluir</button>
+        </div>
+      `).join("")
+    : `<div class="cadastro-vazio">Nenhum cliente cadastrado ainda.</div>`;
+
+  listaTransportadoras.innerHTML = transportadoras.length
+    ? transportadoras.map((item) => `
+        <div class="cadastro-item">
+          <strong>${item}</strong>
+          <button type="button" onclick="removerTransportadora('${item.replace(/'/g, "\\'")}')">Excluir</button>
+        </div>
+      `).join("")
+    : `<div class="cadastro-vazio">Nenhuma transportadora cadastrada ainda.</div>`;
+
+  renderCombo(menuClientes, clientes, "cliente");
+  renderCombo(menuTransportadoras, transportadoras, "transportadora");
 }
 
-function carregarEstadoSidebar() {
-  const estadoSalvo = localStorage.getItem(SIDEBAR_STATE_KEY);
-  aplicarEstadoSidebar(estadoSalvo ? JSON.parse(estadoSalvo) : false);
+function carregarCadastros() {
+  clientes = lerListaStorage(CLIENTES_STORAGE_KEY).sort((a, b) => a.localeCompare(b));
+  transportadoras = lerListaStorage(TRANSPORTADORAS_STORAGE_KEY).sort((a, b) => a.localeCompare(b));
+  renderCadastros();
 }
 
-function alternarFormulario() {
-  const retraido = !document.body.classList.contains("formulario-retraido");
-  aplicarEstadoFormulario(retraido);
-  localStorage.setItem(FORM_STATE_KEY, JSON.stringify(retraido));
+function salvarCliente() {
+  const nome = nomeClienteCadastro.value.trim();
+  if (!nome) {
+    mostrarToast("Informe o nome do cliente.", "aviso");
+    return;
+  }
+
+  if (clientes.some((item) => item.toLowerCase() === nome.toLowerCase())) {
+    mostrarToast("Este cliente já foi cadastrado.", "erro");
+    return;
+  }
+
+  clientes.push(nome);
+  clientes.sort((a, b) => a.localeCompare(b));
+  salvarListaStorage(CLIENTES_STORAGE_KEY, clientes);
+  nomeClienteCadastro.value = "";
+  renderCadastros();
+  mostrarToast("Cliente cadastrado com sucesso.", "sucesso");
 }
 
-function carregarEstadoFormulario() {
-  const estadoSalvo = localStorage.getItem(FORM_STATE_KEY);
-  aplicarEstadoFormulario(estadoSalvo ? JSON.parse(estadoSalvo) : false);
+function salvarTransportadora() {
+  const nome = nomeTransportadoraCadastro.value.trim();
+  if (!nome) {
+    mostrarToast("Informe o nome da transportadora.", "aviso");
+    return;
+  }
+
+  if (transportadoras.some((item) => item.toLowerCase() === nome.toLowerCase())) {
+    mostrarToast("Esta transportadora já foi cadastrada.", "erro");
+    return;
+  }
+
+  transportadoras.push(nome);
+  transportadoras.sort((a, b) => a.localeCompare(b));
+  salvarListaStorage(TRANSPORTADORAS_STORAGE_KEY, transportadoras);
+  nomeTransportadoraCadastro.value = "";
+  renderCadastros();
+  mostrarToast("Transportadora cadastrada com sucesso.", "sucesso");
 }
+
+window.removerCliente = (nome) => {
+  clientes = clientes.filter((item) => item !== nome);
+  salvarListaStorage(CLIENTES_STORAGE_KEY, clientes);
+  renderCadastros();
+  mostrarToast("Cliente removido.", "aviso");
+};
+
+window.removerTransportadora = (nome) => {
+  transportadoras = transportadoras.filter((item) => item !== nome);
+  salvarListaStorage(TRANSPORTADORAS_STORAGE_KEY, transportadoras);
+  renderCadastros();
+  mostrarToast("Transportadora removida.", "aviso");
+};
 
 function salvarNotas() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(notas));
+  salvarListaStorage(STORAGE_KEY, notas);
 }
 
-function carregarNotasSalvas() {
-  const notasSalvas = localStorage.getItem(STORAGE_KEY);
-  if (!notasSalvas) return [];
-
-  try {
-    const dados = JSON.parse(notasSalvas);
-    return Array.isArray(dados) ? dados : [];
-  } catch (error) {
-    console.error("Erro ao ler notas salvas:", error);
-    return [];
-  }
+function carregarNotas() {
+  notas = lerListaStorage(STORAGE_KEY).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  renderNotas();
 }
 
 function obterDadosFormulario() {
   return {
     cliente: cliente.value.trim(),
+    transportadora: transportadora.value.trim(),
     nf: nf.value.trim(),
     pedido: pedido.value.trim(),
     volumes: Number(volumes.value),
@@ -273,6 +462,7 @@ function obterDadosFormulario() {
 
 function limparFormulario() {
   cliente.value = "";
+  transportadora.value = "";
   nf.value = "";
   pedido.value = "";
   volumes.value = "";
@@ -290,7 +480,7 @@ function filtrarNotas() {
   const statusSelecionado = filtroStatus.value;
 
   return notas.filter((nota) => {
-    const atendeBusca = !termo || [nota.cliente, nota.nf, nota.pedido].some((campo) => {
+    const atendeBusca = !termo || [nota.cliente, nota.transportadora, nota.nf, nota.pedido].some((campo) => {
       return String(campo).toLowerCase().includes(termo);
     });
 
@@ -312,7 +502,7 @@ function atualizarResumo() {
   valorTotal.textContent = formatarMoeda(somaValores);
 }
 
-function render() {
+function renderNotas() {
   const notasFiltradas = filtrarNotas();
   listaNotas.innerHTML = "";
   contadorFiltrado.textContent = `${notasFiltradas.length} registro${notasFiltradas.length === 1 ? "" : "s"}`;
@@ -320,7 +510,7 @@ function render() {
   if (!notasFiltradas.length) {
     listaNotas.innerHTML = `
       <tr>
-        <td colspan="9" class="empty-state">
+        <td colspan="10" class="empty-state">
           Nenhum registro encontrado com os filtros atuais.
         </td>
       </tr>
@@ -338,9 +528,10 @@ function render() {
       <td>
         <div class="cliente-cell">
           <strong>${nota.cliente}</strong>
-          <span> ${formatarData(nota.created_at)}</span>
+          <span>${formatarData(nota.created_at)}</span>
         </div>
       </td>
+      <td>${nota.transportadora || "-"}</td>
       <td>${nota.nf}</td>
       <td>${nota.pedido}</td>
       <td>${nota.volumes}</td>
@@ -365,18 +556,10 @@ function render() {
   atualizarResumo();
 }
 
-function carregarNotas() {
-  notas = carregarNotasSalvas().sort((a, b) => {
-    return new Date(b.created_at) - new Date(a.created_at);
-  });
-
-  render();
-}
-
 function salvarRegistro() {
   const dados = obterDadosFormulario();
 
-  if (!dados.cliente || !dados.nf || !dados.pedido || !dados.volumes || !dados.valor || !dados.caixa.length) {
+  if (!dados.cliente || !dados.transportadora || !dados.nf || !dados.pedido || !dados.volumes || !dados.valor || !dados.caixa.length) {
     mostrarToast("Preencha todos os campos.", "aviso");
     return;
   }
@@ -393,15 +576,12 @@ function salvarRegistro() {
   });
 
   if (duplicado) {
-    mostrarToast("Nota fiscal ou pedido ja existente.", "erro");
+    mostrarToast("Nota fiscal ou pedido já existente.", "erro");
     return;
   }
 
   if (editId) {
-    notas = notas.map((nota) => {
-      return nota.id === editId ? { ...nota, ...dados } : nota;
-    });
-
+    notas = notas.map((nota) => (nota.id === editId ? { ...nota, ...dados } : nota));
     mostrarToast("Registro atualizado com sucesso.", "sucesso");
   } else {
     notas.unshift({
@@ -410,7 +590,6 @@ function salvarRegistro() {
       expedido: false,
       created_at: new Date().toISOString()
     });
-
     mostrarToast("Registro criado com sucesso.", "sucesso");
   }
 
@@ -419,63 +598,21 @@ function salvarRegistro() {
   carregarNotas();
 }
 
-btnAdicionar.addEventListener("click", salvarRegistro);
-btnLimpar.addEventListener("click", limparFormulario);
-btnPDF.addEventListener("click", gerarPDF);
-btnToggleSidebar.addEventListener("click", alternarSidebar);
-btnToggleSidebarFloating.addEventListener("click", alternarSidebar);
-btnToggleFormulario.addEventListener("click", alternarFormulario);
-buscaNotas.addEventListener("input", render);
-filtroStatus.addEventListener("change", render);
-btnSair.addEventListener("click", () => {
-  mostrarToast("Acao de saida reservada para a futura autenticacao.", "aviso");
-});
-
-document.querySelectorAll(".checkbox-chip").forEach((chip) => {
-  chip.addEventListener("contextmenu", (evento) => abrirMenuQuantidade(evento, chip));
-});
-
-document.querySelectorAll(".quantidade-opcao").forEach((botao) => {
-  botao.addEventListener("click", () => aplicarQuantidadeAoChip(botao.dataset.quantidade));
-});
-
-btnAplicarQuantidade.addEventListener("click", () => {
-  aplicarQuantidadeAoChip(quantidadeCustomizada.value);
-});
-
-quantidadeCustomizada.addEventListener("keydown", (evento) => {
-  if (evento.key === "Enter") {
-    evento.preventDefault();
-    aplicarQuantidadeAoChip(quantidadeCustomizada.value);
-  }
-});
-
-document.addEventListener("click", (evento) => {
-  if (quantidadeMenu.hidden) return;
-  if (quantidadeMenu.contains(evento.target)) return;
-
-  fecharMenuQuantidade();
-});
-
-document.addEventListener("keydown", (evento) => {
-  if (evento.key === "Escape") {
-    fecharMenuQuantidade();
-  }
-});
-
 window.editar = (id) => {
   const nota = notas.find((item) => item.id === id);
   if (!nota) return;
 
   cliente.value = nota.cliente;
+  transportadora.value = nota.transportadora || "";
   nf.value = nota.nf;
   pedido.value = nota.pedido;
   volumes.value = nota.volumes;
   valor.value = nota.valor;
   definirCaixasSelecionadas(nota.caixa);
   editId = id;
+  navegarPara("painel");
   cliente.focus();
-  mostrarToast("Registro carregado para edicao.", "sucesso");
+  mostrarToast("Registro carregado para edição.", "sucesso");
 };
 
 window.excluir = (id) => {
@@ -484,15 +621,12 @@ window.excluir = (id) => {
 
   notas = notas.filter((nota) => nota.id !== id);
   salvarNotas();
-  mostrarToast("Registro excluido.", "aviso");
+  mostrarToast("Registro excluído.", "aviso");
   carregarNotas();
 };
 
 window.alternarExpedido = (id, estadoAtual) => {
-  notas = notas.map((nota) => {
-    return nota.id === id ? { ...nota, expedido: !estadoAtual } : nota;
-  });
-
+  notas = notas.map((nota) => (nota.id === id ? { ...nota, expedido: !estadoAtual } : nota));
   salvarNotas();
   mostrarToast(!estadoAtual ? "Registro marcado como expedido." : "Registro reaberto.", "sucesso");
   carregarNotas();
@@ -513,9 +647,10 @@ function gerarPDF() {
 
   doc.autoTable({
     startY: 30,
-    head: [["Cliente", "NF", "Pedido", "Volumes", "Caixa", "Valor", "Status"]],
+    head: [["Cliente", "Transportadora", "NF", "Pedido", "Volumes", "Caixa", "Valor", "Status"]],
     body: notasFiltradas.map((nota) => [
       nota.cliente,
+      nota.transportadora || "-",
       nota.nf,
       nota.pedido,
       nota.volumes,
@@ -528,6 +663,86 @@ function gerarPDF() {
   doc.save("relatorio-expedicao.pdf");
 }
 
+btnAdicionar.addEventListener("click", salvarRegistro);
+btnLimpar.addEventListener("click", limparFormulario);
+btnPDF.addEventListener("click", gerarPDF);
+btnToggleSidebar.addEventListener("click", alternarSidebar);
+btnToggleSidebarFloating.addEventListener("click", alternarSidebar);
+btnToggleFormulario.addEventListener("click", alternarFormulario);
+btnSalvarCliente.addEventListener("click", salvarCliente);
+btnSalvarTransportadora.addEventListener("click", salvarTransportadora);
+buscaNotas.addEventListener("input", renderNotas);
+filtroStatus.addEventListener("change", renderNotas);
+btnSair.addEventListener("click", () => {
+  mostrarToast("Ação de saída reservada para a futura autenticação.", "aviso");
+});
+
+cliente.addEventListener("input", () => {
+  if (cliente.value.trim()) {
+    renderCombo(menuClientes, clientes, "cliente");
+    abrirCombo("cliente");
+  } else if (comboAberto === "cliente") {
+    fecharCombos();
+  }
+});
+
+transportadora.addEventListener("input", () => {
+  if (transportadora.value.trim()) {
+    renderCombo(menuTransportadoras, transportadoras, "transportadora");
+    abrirCombo("transportadora");
+  } else if (comboAberto === "transportadora") {
+    fecharCombos();
+  }
+});
+
+document.querySelectorAll(".combo-trigger").forEach((button) => {
+  button.addEventListener("click", (evento) => {
+    evento.stopPropagation();
+    alternarCombo(button.dataset.comboTrigger);
+  });
+});
+
+document.querySelectorAll(".nav-item").forEach((button) => {
+  button.addEventListener("click", () => navegarPara(button.dataset.view));
+});
+
+document.querySelectorAll(".checkbox-chip").forEach((chip) => {
+  chip.addEventListener("contextmenu", (evento) => abrirMenuQuantidade(evento, chip));
+});
+
+document.querySelectorAll(".quantidade-opcao").forEach((botao) => {
+  botao.addEventListener("click", () => aplicarQuantidadeAoChip(botao.dataset.quantidade));
+});
+
+btnAplicarQuantidade.addEventListener("click", () => aplicarQuantidadeAoChip(quantidadeCustomizada.value));
+
+quantidadeCustomizada.addEventListener("keydown", (evento) => {
+  if (evento.key === "Enter") {
+    evento.preventDefault();
+    aplicarQuantidadeAoChip(quantidadeCustomizada.value);
+  }
+});
+
+document.addEventListener("click", (evento) => {
+  const clicouEmCombo = evento.target.closest(".combo-field");
+  if (!clicouEmCombo) {
+    fecharCombos();
+  }
+
+  if (quantidadeMenu.hidden) return;
+  if (quantidadeMenu.contains(evento.target)) return;
+  fecharMenuQuantidade();
+});
+
+document.addEventListener("keydown", (evento) => {
+  if (evento.key === "Escape") {
+    fecharCombos();
+    fecharMenuQuantidade();
+  }
+});
+
 carregarEstadoSidebar();
 carregarEstadoFormulario();
+carregarView();
+carregarCadastros();
 carregarNotas();

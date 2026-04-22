@@ -86,6 +86,10 @@ body.sidebar-collapsed .app-shell {
 
 .sidebar-fab {
   display: none;
+  position: fixed;
+  top: 22px;
+  left: 22px;
+  z-index: 40;
   place-items: center;
   width: 60px;
   height: 60px;
@@ -183,6 +187,52 @@ body.sidebar-collapsed .app-shell {
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
+.sidebar-profile {
+  margin-top: auto;
+  display: grid;
+  gap: 12px;
+}
+
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(88, 194, 191, 0.18), rgba(255, 255, 255, 0.72));
+  border: 1px solid rgba(255, 255, 255, 0.55);
+}
+
+.profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: #4a82c7;
+  color: #fff;
+  font-weight: 700;
+}
+
+.profile-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.profile-copy strong {
+  font-size: 0.96rem;
+}
+
+.profile-copy span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.sidebar-exit {
+  width: 100%;
+  justify-content: center;
+}
+
 body.sidebar-collapsed .sidebar {
   opacity: 0;
   width: 0;
@@ -208,6 +258,16 @@ body.sidebar-collapsed .sidebar-fab:hover {
 .workspace {
   display: grid;
   gap: 20px;
+  position: relative;
+}
+
+.view-section {
+  display: none;
+  gap: 20px;
+}
+
+.view-section.is-active {
+  display: grid;
 }
 
 .hero-panel {
@@ -327,12 +387,67 @@ body.sidebar-collapsed .hero-panel {
   align-items: start;
 }
 
+.cadastro-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.cadastro-form {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.cadastro-lista {
+  display: grid;
+  gap: 10px;
+}
+
+.cadastro-item,
+.placeholder-panel {
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(110, 98, 84, 0.08);
+}
+
+.cadastro-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cadastro-item strong {
+  font-size: 0.98rem;
+}
+
+.cadastro-item button {
+  border: none;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(202, 90, 82, 0.12);
+  color: var(--danger);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.cadastro-vazio {
+  padding: 24px 18px;
+  border-radius: 18px;
+  text-align: center;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.52);
+}
+
 body.formulario-retraido .content-grid {
   grid-template-columns: 30px minmax(0, 1fr);
 }
 
 .panel {
   padding: 24px;
+  position: relative;
 }
 
 .panel-heading {
@@ -428,6 +543,10 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
   transform: translateX(1px) rotate(180deg);
 }
 
+body.sidebar-collapsed .sidebar-profile {
+  display: none;
+}
+
 .field {
   display: grid;
   gap: 8px;
@@ -439,6 +558,7 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
 }
 
 .field input,
+.field select,
 .search-box input,
 .status-filter {
   width: 100%;
@@ -452,6 +572,7 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
 }
 
 .field input:focus,
+.field select:focus,
 .search-box input:focus,
 .status-filter:focus {
   border-color: rgba(88, 194, 191, 0.65);
@@ -461,6 +582,119 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
 .field input::placeholder,
 .search-box input::placeholder {
   color: #978d82;
+}
+
+.input-com-icone {
+  position: relative;
+}
+
+.combo-trigger {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.combo-trigger::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid #6e6254;
+  border-bottom: 2px solid #6e6254;
+  transform: translate(-50%, -70%) rotate(45deg);
+  opacity: 0.9;
+}
+
+.input-com-icone input {
+  padding-right: 44px;
+}
+
+.combo-field {
+  position: relative;
+  z-index: 20;
+}
+
+.combo-field.is-open .input-com-icone input {
+  border-color: rgba(91, 148, 218, 0.45);
+  box-shadow: 0 0 0 3px rgba(91, 148, 218, 0.12);
+}
+
+.combo-menu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 18px);
+  width: min(320px, 42vw);
+  z-index: 80;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 20px 36px rgba(67, 55, 36, 0.18);
+}
+
+.combo-menu[hidden] {
+  display: none;
+}
+
+.combo-option {
+  border: none;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #eef3fb;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font-weight: 700;
+  transition: transform 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.combo-option:hover {
+  transform: translateY(-1px);
+  background: #dfeafb;
+  box-shadow: 0 10px 18px rgba(76, 67, 52, 0.08);
+}
+
+.panel-form {
+  z-index: 10;
+  overflow: visible;
+}
+
+.panel-table {
+  z-index: 1;
+}
+
+.combo-empty {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 44px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #6e6254 50%),
+    linear-gradient(135deg, #6e6254 50%, transparent 50%);
+  background-position:
+    calc(100% - 22px) calc(50% - 2px),
+    calc(100% - 16px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
 }
 
 .checkbox-group {
@@ -645,7 +879,7 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
 .notas-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
+  min-width: 960px;
 }
 
 .notas-table th,
@@ -808,6 +1042,10 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
   .content-grid {
     grid-template-columns: 1fr;
   }
+
+  .cadastro-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 960px) {
@@ -832,6 +1070,12 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
   body.sidebar-collapsed .sidebar {
     min-height: 0;
     margin-right: 0;
+  }
+
+  .combo-menu {
+    top: calc(100% + 10px);
+    left: 0;
+    width: 100%;
   }
 }
 
@@ -860,6 +1104,8 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
   }
 
   .sidebar-fab {
+    top: 16px;
+    left: 16px;
     width: 52px;
     height: 52px;
     border-radius: 18px;
