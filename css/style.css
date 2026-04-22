@@ -47,7 +47,7 @@ select {
 }
 
 body.sidebar-collapsed .app-shell {
-  grid-template-columns: 0 minmax(0, 1fr);
+  grid-template-columns: 92px minmax(0, 1fr);
 }
 
 .sidebar,
@@ -75,6 +75,7 @@ body.sidebar-collapsed .app-shell {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-height: 58px;
 }
 
 .brand-toggle {
@@ -82,10 +83,11 @@ body.sidebar-collapsed .app-shell {
   padding: 0;
   background: transparent;
   cursor: pointer;
+  flex: 0 0 auto;
 }
 
 .sidebar-fab {
-  display: none;
+  display: none !important;
   position: fixed;
   top: 22px;
   left: 22px;
@@ -145,6 +147,7 @@ body.sidebar-collapsed .app-shell {
 }
 
 .brand-copy {
+  overflow: hidden;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
@@ -155,6 +158,9 @@ body.sidebar-collapsed .app-shell {
 }
 
 .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   width: 100%;
   padding: 14px 16px;
   border: 1px solid transparent;
@@ -164,6 +170,26 @@ body.sidebar-collapsed .app-shell {
   text-align: left;
   cursor: pointer;
   transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.nav-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.nav-icon svg,
+.sidebar-exit-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.nav-label {
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .nav-item:hover {
@@ -217,6 +243,7 @@ body.sidebar-collapsed .app-shell {
 .profile-copy {
   display: grid;
   gap: 4px;
+  overflow: hidden;
 }
 
 .profile-copy strong {
@@ -233,26 +260,64 @@ body.sidebar-collapsed .app-shell {
   justify-content: center;
 }
 
+.sidebar-exit-icon {
+  display: inline-grid;
+  place-items: center;
+}
+
 body.sidebar-collapsed .sidebar {
-  opacity: 0;
+  align-items: center;
+  padding-inline: 12px;
+}
+
+body.sidebar-collapsed .brand {
+  justify-content: center;
+  gap: 0;
+}
+
+body.sidebar-collapsed .brand-copy,
+body.sidebar-collapsed .nav-label,
+body.sidebar-collapsed .profile-copy,
+body.sidebar-collapsed .sidebar-exit-label {
   width: 0;
-  min-width: 0;
-  margin-right: -22px;
-  padding-inline: 0;
-  transform: translateX(-32px);
+  opacity: 0;
+  transform: translateX(-8px);
   pointer-events: none;
 }
 
-body.sidebar-collapsed .sidebar-fab {
-  display: grid;
-  opacity: 0.78;
-  background: rgba(255, 255, 255, 0.52);
-  border-color: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(14px);
+body.sidebar-collapsed .side-nav {
+  justify-items: center;
 }
 
-body.sidebar-collapsed .sidebar-fab:hover {
-  opacity: 1;
+body.sidebar-collapsed .nav-item {
+  justify-content: center;
+  width: 60px;
+  min-height: 60px;
+  padding: 0;
+  gap: 0;
+  border-radius: 20px;
+}
+
+body.sidebar-collapsed .nav-item:hover {
+  transform: translateY(-2px);
+}
+
+body.sidebar-collapsed .sidebar-profile {
+  justify-items: center;
+}
+
+body.sidebar-collapsed .profile-card {
+  justify-content: center;
+  padding: 10px;
+  gap: 0;
+}
+
+body.sidebar-collapsed .sidebar-exit {
+  width: 52px;
+  min-height: 52px;
+  padding: 0;
+  gap: 0;
+  border-radius: 16px;
 }
 
 .workspace {
@@ -344,6 +409,7 @@ body.sidebar-collapsed .hero-panel {
   background: #f2b738;
   color: #342714;
   cursor: pointer;
+  gap: 10px;
 }
 
 .session-exit:hover {
@@ -541,10 +607,6 @@ body.formulario-retraido .panel-form .panel-toggle:hover {
 body.formulario-retraido .panel-form .panel-toggle-icon {
   font-size: 0.82rem;
   transform: translateX(1px) rotate(180deg);
-}
-
-body.sidebar-collapsed .sidebar-profile {
-  display: none;
 }
 
 .field {
@@ -985,6 +1047,29 @@ body.sidebar-collapsed .sidebar-profile {
   color: var(--danger);
 }
 
+body.sidebar-collapsed.formulario-retraido .panel-table {
+  min-width: 0;
+}
+
+body.sidebar-collapsed.formulario-retraido .notas-table {
+  min-width: 860px;
+}
+
+body.sidebar-collapsed.formulario-retraido .notas-table th,
+body.sidebar-collapsed.formulario-retraido .notas-table td {
+  padding: 14px 10px;
+}
+
+body.sidebar-collapsed.formulario-retraido .acoes-cell {
+  gap: 6px;
+  padding: 5px 6px;
+}
+
+body.sidebar-collapsed.formulario-retraido .table-action {
+  padding: 7px 9px;
+  font-size: 0.84rem;
+}
+
 .empty-state {
   padding: 44px 20px;
   text-align: center;
@@ -1007,6 +1092,7 @@ body.sidebar-collapsed .sidebar-profile {
   position: fixed;
   right: 24px;
   bottom: 24px;
+  z-index: 9999;
   max-width: min(360px, calc(100vw - 32px));
   padding: 14px 18px;
   border-radius: 18px;
@@ -1069,7 +1155,50 @@ body.sidebar-collapsed .sidebar-profile {
 
   body.sidebar-collapsed .sidebar {
     min-height: 0;
-    margin-right: 0;
+    align-items: stretch;
+    padding-inline: 18px;
+  }
+
+  body.sidebar-collapsed .brand-copy,
+  body.sidebar-collapsed .nav-label,
+  body.sidebar-collapsed .profile-copy,
+  body.sidebar-collapsed .sidebar-exit-label {
+    width: auto;
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  body.sidebar-collapsed .side-nav {
+    justify-items: stretch;
+  }
+
+  body.sidebar-collapsed .nav-item {
+    width: 100%;
+    min-height: auto;
+    padding: 14px 16px;
+    justify-content: flex-start;
+    border-radius: 18px;
+  }
+
+  body.sidebar-collapsed .nav-item:hover {
+    transform: translateX(4px);
+  }
+
+  body.sidebar-collapsed .sidebar-profile {
+    justify-items: stretch;
+  }
+
+  body.sidebar-collapsed .profile-card {
+    justify-content: flex-start;
+    padding: 14px;
+  }
+
+  body.sidebar-collapsed .sidebar-exit {
+    width: 100%;
+    min-height: 40px;
+    padding: 10px 16px;
+    border-radius: 999px;
   }
 
   .combo-menu {
