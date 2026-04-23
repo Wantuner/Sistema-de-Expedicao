@@ -1240,3 +1240,72 @@ body.sidebar-collapsed.formulario-retraido .table-action {
     border-radius: 18px;
   }
 }
+
+/* --- 1. Correção do Avatar no Layout (Para evitar o erro das fotos) --- */
+.profile-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: #4a82c7;
+  overflow: hidden; /* IMPORTANTE: Corta a imagem que sobrar */
+  flex-shrink: 0;   /* Impede que o avatar seja esmagado pelo texto */
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.profile-avatar:hover {
+  transform: scale(1.05);
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Garante que a logo preencha o quadrado sem distorcer */
+  display: block;
+}
+
+/* --- 2. Seu Bloco de Modal (Mantido e Ajustado) --- */
+.modal-zoom {
+  display: none; 
+  position: fixed;
+  z-index: 10000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(41, 35, 28, 0.85); 
+  backdrop-filter: blur(12px);
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+
+.modal-content {
+  max-width: 85%;
+  max-height: 85%;
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  animation: zoomImgIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Adicionado para garantir que a imagem no modal não distorça */
+  object-fit: contain; 
+}
+
+.modal-close {
+  position: absolute;
+  top: 30px;
+  right: 30px;
+  color: #fff;
+  font-size: 40px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+@keyframes zoomImgIn {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

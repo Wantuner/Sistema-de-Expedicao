@@ -746,3 +746,36 @@ carregarEstadoFormulario();
 carregarView();
 carregarCadastros();
 carregarNotas();
+
+// Funcionalidade de Ampliação da Imagem de Perfil
+const iniciarZoomAvatar = () => {
+    const modal = document.getElementById("modalAvatar");
+    const avatar = document.querySelector(".profile-avatar");
+    const imgAmpliada = document.getElementById("imgAmpliada");
+
+    if (!modal || !avatar) return;
+
+    // Abrir modal
+    avatar.addEventListener("click", () => {
+        const imgOriginal = avatar.querySelector("img");
+        if (imgOriginal) {
+            imgAmpliada.src = imgOriginal.src;
+            modal.style.display = "flex";
+        }
+    });
+
+    // Fechar ao clicar no fundo ou no botão de fechar
+    modal.addEventListener("click", () => {
+        modal.style.display = "none";
+    });
+
+    // Fechar com a tecla ESC para melhor acessibilidade
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modal.style.display === "flex") {
+            modal.style.display = "none";
+        }
+    });
+};
+
+// Inicializa a função
+document.addEventListener("DOMContentLoaded", iniciarZoomAvatar);
