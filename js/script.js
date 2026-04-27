@@ -16,9 +16,14 @@ const btnToggleSidebar = document.getElementById("btnToggleSidebar");
 const btnToggleSidebarFloating = document.getElementById("btnToggleSidebarFloating");
 const btnSalvarCliente = document.getElementById("btnSalvarCliente");
 const btnSalvarTransportadora = document.getElementById("btnSalvarTransportadora");
+const btnSalvarMotorista = document.getElementById("btnSalvarMotorista");
+const btnToggleClientes = document.getElementById("btnToggleClientes");
+const btnToggleTransportadoras = document.getElementById("btnToggleTransportadoras");
+const btnToggleMotoristas = document.getElementById("btnToggleMotoristas");
 
 const nomeClienteCadastro = document.getElementById("nomeClienteCadastro");
 const nomeTransportadoraCadastro = document.getElementById("nomeTransportadoraCadastro");
+const nomeMotorista = document.getElementById("nomeMotorista");
 
 const buscaNotas = document.getElementById("buscaNotas");
 const filtroStatus = document.getElementById("filtroStatus");
@@ -26,8 +31,10 @@ const listaNotas = document.getElementById("listaNotas");
 const contadorFiltrado = document.getElementById("contadorFiltrado");
 const listaClientes = document.getElementById("listaClientes");
 const listaTransportadoras = document.getElementById("listaTransportadoras");
+const listaMotoristas = document.getElementById("listaMotoristas");
 const contadorClientes = document.getElementById("contadorClientes");
 const contadorTransportadoras = document.getElementById("contadorTransportadoras");
+const contadorMotoristas = document.getElementById("contadorMotoristas");
 
 const totalNotas = document.getElementById("totalNotas");
 const totalPendentes = document.getElementById("totalPendentes");
@@ -43,13 +50,18 @@ const btnAplicarQuantidade = document.getElementById("btnAplicarQuantidade");
 const STORAGE_KEY = "expedicao.notas";
 const CLIENTES_STORAGE_KEY = "expedicao.clientes";
 const TRANSPORTADORAS_STORAGE_KEY = "expedicao.transportadoras";
+const MOTORISTAS_STORAGE_KEY = "expedicao.motoristas";
 const SIDEBAR_STATE_KEY = "expedicao.sidebarCollapsed";
 const FORM_STATE_KEY = "expedicao.formularioRetraido";
 const VIEW_STATE_KEY = "expedicao.viewAtual";
+const CLIENTES_VISIBLE_KEY = "expedicao.clientesVisible";
+const TRANSPORTADORAS_VISIBLE_KEY = "expedicao.transportadorasVisible";
+const MOTORISTAS_VISIBLE_KEY = "expedicao.motoristasVisible";
 
 let notas = [];
 let clientes = [];
 let transportadoras = [];
+let motoristas = [];
 let editId = null;
 let chipCaixaAtivo = null;
 let comboAberto = null;
@@ -239,6 +251,38 @@ function navegarPara(view) {
   localStorage.setItem(VIEW_STATE_KEY, view);
 }
 
+function toggleListaCadastros(tipo) {
+  const mapeamento = {
+    clientes: { lista: listaClientes, botao: btnToggleClientes, chave: CLIENTES_VISIBLE_KEY },
+    transportadoras: { lista: listaTransportadoras, botao: btnToggleTransportadoras, chave: TRANSPORTADORAS_VISIBLE_KEY },
+    motoristas: { lista: listaMotoristas, botao: btnToggleMotoristas, chave: MOTORISTAS_VISIBLE_KEY }
+  };
+
+  const config = mapeamento[tipo];
+  if (!config) return;
+
+  const visivel = !config.lista.classList.contains("is-hidden");
+  const novoEstado = !visivel;
+
+  config.lista.classList.toggle("is-hidden", !novoEstado);
+  config.botao.setAttribute("aria-expanded", String(novoEstado));
+  localStorage.setItem(config.chave, JSON.stringify(novoEstado));
+}
+
+function carregarEstadoListas() {
+  const estados = [
+    { lista: listaClientes, botao: btnToggleClientes, chave: CLIENTES_VISIBLE_KEY },
+    { lista: listaTransportadoras, botao: btnToggleTransportadoras, chave: TRANSPORTADORAS_VISIBLE_KEY },
+    { lista: listaMotoristas, botao: btnToggleMotoristas, chave: MOTORISTAS_VISIBLE_KEY }
+  ];
+
+  estados.forEach(({ lista, botao, chave }) => {
+    const visivel = JSON.parse(localStorage.getItem(chave) || "false");
+    lista.classList.toggle("is-hidden", !visivel);
+    botao.setAttribute("aria-expanded", String(visivel));
+  });
+}
+
 function fecharMenuQuantidade() {
   chipCaixaAtivo = null;
   quantidadeMenu.hidden = true;
@@ -356,6 +400,7 @@ function alternarCombo(tipo) {
 function renderCadastros() {
   contadorClientes.textContent = `${clientes.length} cliente${clientes.length === 1 ? "" : "s"}`;
   contadorTransportadoras.textContent = `${transportadoras.length} transportadora${transportadoras.length === 1 ? "" : "s"}`;
+  contadorMotoristas.textContent = `${motoristas.length} motorista${motoristas.length === 1 ? "" : "s"}`;
 
   listaClientes.innerHTML = clientes.length
     ? clientes.map((item) => `
@@ -375,6 +420,15 @@ function renderCadastros() {
       `).join("")
     : `<div class="cadastro-vazio">Nenhuma transportadora cadastrada ainda.</div>`;
 
+  listaMotoristas.innerHTML = motoristas.length
+    ? motoristas.map((item) => `
+        <div class="cadastro-item">
+          <strong>${item}</strong>
+          <button type="button" onclick="removerMotorista('${item.replace(/'/g, "\\'")}')">Excluir</button>
+        </div>
+      `).join("")
+    : `<div class="cadastro-vazio">Nenhum motorista cadastrado ainda.</div>`;
+
   renderCombo(menuClientes, clientes, "cliente");
   renderCombo(menuTransportadoras, transportadoras, "transportadora");
 }
@@ -382,6 +436,7 @@ function renderCadastros() {
 function carregarCadastros() {
   clientes = lerListaStorage(CLIENTES_STORAGE_KEY).sort((a, b) => a.localeCompare(b));
   transportadoras = lerListaStorage(TRANSPORTADORAS_STORAGE_KEY).sort((a, b) => a.localeCompare(b));
+  motoristas = lerListaStorage(MOTORISTAS_STORAGE_KEY).sort((a, b) => a.localeCompare(b));
   renderCadastros();
 }
 
@@ -425,6 +480,26 @@ function salvarTransportadora() {
   mostrarToast("Transportadora cadastrada com sucesso.", "sucesso");
 }
 
+function salvarMotorista() {
+  const nome = nomeMotorista.value.trim();
+  if (!nome) {
+    mostrarToast("Informe o nome do motorista.", "aviso");
+    return;
+  }
+
+  if (motoristas.some((item) => item.toLowerCase() === nome.toLowerCase())) {
+    mostrarToast("Este motorista já foi cadastrado.", "erro");
+    return;
+  }
+
+  motoristas.push(nome);
+  motoristas.sort((a, b) => a.localeCompare(b));
+  salvarListaStorage(MOTORISTAS_STORAGE_KEY, motoristas);
+  nomeMotorista.value = "";
+  renderCadastros();
+  mostrarToast("Motorista cadastrado com sucesso.", "sucesso");
+}
+
 window.removerCliente = (nome) => {
   clientes = clientes.filter((item) => item !== nome);
   salvarListaStorage(CLIENTES_STORAGE_KEY, clientes);
@@ -437,6 +512,13 @@ window.removerTransportadora = (nome) => {
   salvarListaStorage(TRANSPORTADORAS_STORAGE_KEY, transportadoras);
   renderCadastros();
   mostrarToast("Transportadora removida.", "aviso");
+};
+
+window.removerMotorista = (nome) => {
+  motoristas = motoristas.filter((item) => item !== nome);
+  salvarListaStorage(MOTORISTAS_STORAGE_KEY, motoristas);
+  renderCadastros();
+  mostrarToast("Motorista removido.", "aviso");
 };
 
 function salvarNotas() {
@@ -671,6 +753,10 @@ btnToggleSidebarFloating.addEventListener("click", alternarSidebar);
 btnToggleFormulario.addEventListener("click", alternarFormulario);
 btnSalvarCliente.addEventListener("click", salvarCliente);
 btnSalvarTransportadora.addEventListener("click", salvarTransportadora);
+btnSalvarMotorista.addEventListener("click", salvarMotorista);
+btnToggleClientes.addEventListener("click", () => toggleListaCadastros("clientes"));
+btnToggleTransportadoras.addEventListener("click", () => toggleListaCadastros("transportadoras"));
+btnToggleMotoristas.addEventListener("click", () => toggleListaCadastros("motoristas"));
 buscaNotas.addEventListener("input", renderNotas);
 filtroStatus.addEventListener("change", renderNotas);
 btnSair.addEventListener("click", () => {
@@ -743,6 +829,7 @@ document.addEventListener("keydown", (evento) => {
 
 carregarEstadoSidebar();
 carregarEstadoFormulario();
+carregarEstadoListas();
 carregarView();
 carregarCadastros();
 carregarNotas();

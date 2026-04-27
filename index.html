@@ -249,7 +249,7 @@
             <p class="eyebrow">Base de apoio</p>
             <h2>Área de Cadastro</h2>
             <p class="hero-copy">
-              Cadastre clientes e transportadoras para usar essas opções diretamente em lançamentos.
+              Cadastre clientes, transportadoras e motoristas para usar essas opções diretamente em lançamentos.
             </p>
           </div>
         </section>
@@ -261,7 +261,12 @@
                 <p class="eyebrow">Cadastro mestre</p>
                 <h2>Clientes</h2>
               </div>
-              <span id="contadorClientes" class="panel-chip">0 clientes</span>
+              <div class="panel-actions">
+                <span id="contadorClientes" class="panel-chip">0 clientes</span>
+                <button id="btnToggleClientes" class="btn-toggle-lista" type="button" aria-expanded="false" aria-label="Mostrar lista de clientes">
+                  <span class="toggle-icon">▼</span>
+                </button>
+              </div>
             </div>
 
             <form class="cadastro-form" id="formCliente">
@@ -272,7 +277,7 @@
               <button id="btnSalvarCliente" class="btn btn-primary" type="button">Salvar cliente</button>
             </form>
 
-            <div class="cadastro-lista" id="listaClientes"></div>
+            <div class="cadastro-lista is-hidden" id="listaClientes"></div>
           </section>
 
           <section class="panel">
@@ -281,7 +286,12 @@
                 <p class="eyebrow">Cadastro mestre</p>
                 <h2>Transportadoras</h2>
               </div>
-              <span id="contadorTransportadoras" class="panel-chip">0 transportadoras</span>
+              <div class="panel-actions">
+                <span id="contadorTransportadoras" class="panel-chip">0 transportadoras</span>
+                <button id="btnToggleTransportadoras" class="btn-toggle-lista" type="button" aria-expanded="false" aria-label="Mostrar lista de transportadoras">
+                  <span class="toggle-icon">▼</span>
+                </button>
+              </div>
             </div>
 
             <form class="cadastro-form" id="formTransportadora">
@@ -292,7 +302,32 @@
               <button id="btnSalvarTransportadora" class="btn btn-primary" type="button">Salvar transportadora</button>
             </form>
 
-            <div class="cadastro-lista" id="listaTransportadoras"></div>
+            <div class="cadastro-lista is-hidden" id="listaTransportadoras"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Cadastro mestre</p>
+                <h2>Motoristas</h2>
+              </div>
+              <div class="panel-actions">
+                <span id="contadorMotoristas" class="panel-chip">0 motoristas</span>
+                <button id="btnToggleMotoristas" class="btn-toggle-lista" type="button" aria-expanded="false" aria-label="Mostrar lista de motoristas">
+                  <span class="toggle-icon">▼</span>
+                </button>
+              </div>
+            </div>
+
+            <form class="cadastro-form" id="formMotorista">
+              <label class="field">
+                <span>Nome do motorista</span>
+                <input id="nomeMotorista" placeholder="Ex.: João Silva">
+              </label>
+              <button id="btnSalvarMotorista" class="btn btn-primary" type="button">Salvar motorista</button>
+            </form>
+
+            <div class="cadastro-lista is-hidden" id="listaMotoristas"></div>
           </section>
         </section>
       </section>
