@@ -58,6 +58,12 @@ const CLIENTES_VISIBLE_KEY = "expedicao.clientesVisible";
 const TRANSPORTADORAS_VISIBLE_KEY = "expedicao.transportadorasVisible";
 const MOTORISTAS_VISIBLE_KEY = "expedicao.motoristasVisible";
 
+const supabaseConfig = window.SUPABASE_CONFIG || {};
+const supabaseUrl = String(supabaseConfig.url || "").trim();
+const supabaseAnonKey = String(supabaseConfig.anonKey || "").trim();
+const bancoSupabaseAtivo = Boolean(window.supabase && supabaseUrl && supabaseAnonKey);
+const banco = bancoSupabaseAtivo ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null;
+
 let notas = [];
 let clientes = [];
 let transportadoras = [];
@@ -85,6 +91,31 @@ function lerListaStorage(chave) {
 
 function salvarListaStorage(chave, lista) {
   localStorage.setItem(chave, JSON.stringify(lista));
+}
+
+function tratarErroBanco(error) {
+  console.error("Erro no Supabase:", error);
+  mostrarToast("Nao foi possivel sincronizar com o banco de dados.", "erro");
+}
+
+async function carregarNomesTabela(tabela) {
+  const { data, error } = await banco
+    .from(tabela)
+    .select("nome")
+    .order("nome", { ascending: true });
+
+  if (error) throw error;
+  return (data || []).map((item) => item.nome);
+}
+
+async function inserirNomeTabela(tabela, nome) {
+  const { error } = await banco.from(tabela).insert({ nome });
+  if (error) throw error;
+}
+
+async function removerNomeTabela(tabela, nome) {
+  const { error } = await banco.from(tabela).delete().eq("nome", nome);
+  if (error) throw error;
 }
 
 function obterCaixasSelecionadas() {
@@ -433,14 +464,28 @@ function renderCadastros() {
   renderCombo(menuTransportadoras, transportadoras, "transportadora");
 }
 
-function carregarCadastros() {
+async function carregarCadastros() {
+  if (bancoSupabaseAtivo) {
+    try {
+      [clientes, transportadoras, motoristas] = await Promise.all([
+        carregarNomesTabela("clientes"),
+        carregarNomesTabela("transportadoras"),
+        carregarNomesTabela("motoristas")
+      ]);
+      renderCadastros();
+      return;
+    } catch (error) {
+      tratarErroBanco(error);
+    }
+  }
+
   clientes = lerListaStorage(CLIENTES_STORAGE_KEY).sort((a, b) => a.localeCompare(b));
   transportadoras = lerListaStorage(TRANSPORTADORAS_STORAGE_KEY).sort((a, b) => a.localeCompare(b));
   motoristas = lerListaStorage(MOTORISTAS_STORAGE_KEY).sort((a, b) => a.localeCompare(b));
   renderCadastros();
 }
 
-function salvarCliente() {
+async function salvarCliente() {
   const nome = nomeClienteCadastro.value.trim();
   if (!nome) {
     mostrarToast("Informe o nome do cliente.", "aviso");
@@ -452,6 +497,18 @@ function salvarCliente() {
     return;
   }
 
+  if (bancoSupabaseAtivo) {
+    try {
+      await inserirNomeTabela("clientes", nome);
+      nomeClienteCadastro.value = "";
+      await carregarCadastros();
+      mostrarToast("Cliente cadastrado com sucesso.", "sucesso");
+    } catch (error) {
+      tratarErroBanco(error);
+    }
+    return;
+  }
+
   clientes.push(nome);
   clientes.sort((a, b) => a.localeCompare(b));
   salvarListaStorage(CLIENTES_STORAGE_KEY, clientes);
@@ -460,7 +517,7 @@ function salvarCliente() {
   mostrarToast("Cliente cadastrado com sucesso.", "sucesso");
 }
 
-function salvarTransportadora() {
+async function salvarTransportadora() {
   const nome = nomeTransportadoraCadastro.value.trim();
   if (!nome) {
     mostrarToast("Informe o nome da transportadora.", "aviso");
@@ -472,6 +529,18 @@ function salvarTransportadora() {
     return;
   }
 
+  if (bancoSupabaseAtivo) {
+    try {
+      await inserirNomeTabela("transportadoras", nome);
+      nomeTransportadoraCadastro.value = "";
+      await carregarCadastros();
+      mostrarToast("Transportadora cadastrada com sucesso.", "sucesso");
+    } catch (error) {
+      tratarErroBanco(error);
+    }
+    return;
+  }
+
   transportadoras.push(nome);
   transportadoras.sort((a, b) => a.localeCompare(b));
   salvarListaStorage(TRANSPORTADORAS_STORAGE_KEY, transportadoras);
@@ -480,7 +549,7 @@ function salvarTransportadora() {
   mostrarToast("Transportadora cadastrada com sucesso.", "sucesso");
 }
 
-function salvarMotorista() {
+async function salvarMotorista() {
   const nome = nomeMotorista.value.trim();
   if (!nome) {
     mostrarToast("Informe o nome do motorista.", "aviso");
@@ -492,6 +561,18 @@ function salvarMotorista() {
     return;
   }
 
+  if (bancoSupabaseAtivo) {
+    try {
+      await inserirNomeTabela("motoristas", nome);
+      nomeMotorista.value = "";
+      await carregarCadastros();
+      mostrarToast("Motorista cadastrado com sucesso.", "sucesso");
+    } catch (error) {
+      tratarErroBanco(error);
+    }
+    return;
+  }
+
   motoristas.push(nome);
   motoristas.sort((a, b) => a.localeCompare(b));
   salvarListaStorage(MOTORISTAS_STORAGE_KEY, motoristas);
@@ -500,21 +581,54 @@ function salvarMotorista() {
   mostrarToast("Motorista cadastrado com sucesso.", "sucesso");
 }
 
-window.removerCliente = (nome) => {
+window.removerCliente = async (nome) => {
+  if (bancoSupabaseAtivo) {
+    try {
+      await removerNomeTabela("clientes", nome);
+      await carregarCadastros();
+      mostrarToast("Cliente removido.", "aviso");
+    } catch (error) {
+      tratarErroBanco(error);
+    }
+    return;
+  }
+
   clientes = clientes.filter((item) => item !== nome);
   salvarListaStorage(CLIENTES_STORAGE_KEY, clientes);
   renderCadastros();
   mostrarToast("Cliente removido.", "aviso");
 };
 
-window.removerTransportadora = (nome) => {
+window.removerTransportadora = async (nome) => {
+  if (bancoSupabaseAtivo) {
+    try {
+      await removerNomeTabela("transportadoras", nome);
+      await carregarCadastros();
+      mostrarToast("Transportadora removida.", "aviso");
+    } catch (error) {
+      tratarErroBanco(error);
+    }
+    return;
+  }
+
   transportadoras = transportadoras.filter((item) => item !== nome);
   salvarListaStorage(TRANSPORTADORAS_STORAGE_KEY, transportadoras);
   renderCadastros();
   mostrarToast("Transportadora removida.", "aviso");
 };
 
-window.removerMotorista = (nome) => {
+window.removerMotorista = async (nome) => {
+  if (bancoSupabaseAtivo) {
+    try {
+      await removerNomeTabela("motoristas", nome);
+      await carregarCadastros();
+      mostrarToast("Motorista removido.", "aviso");
+    } catch (error) {
+      tratarErroBanco(error);
+    }
+    return;
+  }
+
   motoristas = motoristas.filter((item) => item !== nome);
   salvarListaStorage(MOTORISTAS_STORAGE_KEY, motoristas);
   renderCadastros();
@@ -522,10 +636,30 @@ window.removerMotorista = (nome) => {
 };
 
 function salvarNotas() {
+  if (bancoSupabaseAtivo) return;
   salvarListaStorage(STORAGE_KEY, notas);
 }
 
-function carregarNotas() {
+async function carregarNotas() {
+  if (bancoSupabaseAtivo) {
+    try {
+      const { data, error } = await banco
+        .from("notas")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      notas = (data || []).map((nota) => ({
+        ...nota,
+        caixa: normalizarCaixas(nota.caixa)
+      }));
+      renderNotas();
+      return;
+    } catch (error) {
+      tratarErroBanco(error);
+    }
+  }
+
   notas = lerListaStorage(STORAGE_KEY).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   renderNotas();
 }
@@ -638,7 +772,7 @@ function renderNotas() {
   atualizarResumo();
 }
 
-function salvarRegistro() {
+async function salvarRegistro() {
   const dados = obterDadosFormulario();
 
   if (!dados.cliente || !dados.transportadora || !dados.nf || !dados.pedido || !dados.volumes || !dados.valor || !dados.caixa.length) {
@@ -659,6 +793,36 @@ function salvarRegistro() {
 
   if (duplicado) {
     mostrarToast("Nota fiscal ou pedido já existente.", "erro");
+    return;
+  }
+
+  if (bancoSupabaseAtivo) {
+    try {
+      if (editId) {
+        const { error } = await banco
+          .from("notas")
+          .update(dados)
+          .eq("id", editId);
+
+        if (error) throw error;
+        mostrarToast("Registro atualizado com sucesso.", "sucesso");
+      } else {
+        const { error } = await banco
+          .from("notas")
+          .insert({
+            ...dados,
+            expedido: false
+          });
+
+        if (error) throw error;
+        mostrarToast("Registro criado com sucesso.", "sucesso");
+      }
+
+      limparFormulario();
+      await carregarNotas();
+    } catch (error) {
+      tratarErroBanco(error);
+    }
     return;
   }
 
@@ -697,9 +861,21 @@ window.editar = (id) => {
   mostrarToast("Registro carregado para edição.", "sucesso");
 };
 
-window.excluir = (id) => {
+window.excluir = async (id) => {
   const confirmar = window.confirm("Deseja realmente excluir este registro?");
   if (!confirmar) return;
+
+  if (bancoSupabaseAtivo) {
+    try {
+      const { error } = await banco.from("notas").delete().eq("id", id);
+      if (error) throw error;
+      mostrarToast("Registro excluido.", "aviso");
+      await carregarNotas();
+    } catch (error) {
+      tratarErroBanco(error);
+    }
+    return;
+  }
 
   notas = notas.filter((nota) => nota.id !== id);
   salvarNotas();
@@ -707,7 +883,23 @@ window.excluir = (id) => {
   carregarNotas();
 };
 
-window.alternarExpedido = (id, estadoAtual) => {
+window.alternarExpedido = async (id, estadoAtual) => {
+  if (bancoSupabaseAtivo) {
+    try {
+      const { error } = await banco
+        .from("notas")
+        .update({ expedido: !estadoAtual })
+        .eq("id", id);
+
+      if (error) throw error;
+      mostrarToast(!estadoAtual ? "Registro marcado como expedido." : "Registro reaberto.", "sucesso");
+      await carregarNotas();
+    } catch (error) {
+      tratarErroBanco(error);
+    }
+    return;
+  }
+
   notas = notas.map((nota) => (nota.id === id ? { ...nota, expedido: !estadoAtual } : nota));
   salvarNotas();
   mostrarToast(!estadoAtual ? "Registro marcado como expedido." : "Registro reaberto.", "sucesso");
@@ -827,12 +1019,16 @@ document.addEventListener("keydown", (evento) => {
   }
 });
 
-carregarEstadoSidebar();
-carregarEstadoFormulario();
-carregarEstadoListas();
-carregarView();
-carregarCadastros();
-carregarNotas();
+async function iniciarSistema() {
+  carregarEstadoSidebar();
+  carregarEstadoFormulario();
+  carregarEstadoListas();
+  carregarView();
+  await carregarCadastros();
+  await carregarNotas();
+}
+
+iniciarSistema();
 
 // Funcionalidade de Ampliação da Imagem de Perfil
 const iniciarZoomAvatar = () => {

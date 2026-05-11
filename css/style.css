@@ -459,6 +459,24 @@ body.sidebar-collapsed .hero-panel {
   gap: 20px;
 }
 
+.cadastro-grid > .panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.cadastro-grid .panel-heading {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: start;
+  gap: 12px;
+  min-height: 108px;
+}
+
+.cadastro-grid .panel-actions {
+  justify-self: end;
+  margin-left: 0;
+}
+
 .cadastro-form {
   display: grid;
   gap: 14px;
