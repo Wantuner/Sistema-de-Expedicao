@@ -319,14 +319,14 @@ function fecharMenuQuantidade() {
   quantidadeMenu.hidden = true;
 }
 
-function posicionarMenuQuantidade() {
+function posicionarMenuQuantidade(evento) {
   const margem = 12;
   quantidadeMenu.hidden = false;
 
   const largura = quantidadeMenu.offsetWidth;
   const altura = quantidadeMenu.offsetHeight;
-  const leftPreferido = 395;
-  const topPreferido = 395;
+  const leftPreferido = evento?.clientX || window.innerWidth / 2;
+  const topPreferido = evento?.clientY || window.innerHeight / 2;
 
   const left = Math.max(margem, Math.min(leftPreferido, window.innerWidth - largura - margem));
   const top = Math.max(margem, Math.min(topPreferido, window.innerHeight - altura - margem));
@@ -358,7 +358,7 @@ function abrirMenuQuantidade(evento, chip) {
 
   quantidadeMenuTitulo.textContent = `Quantidade de caixas ${tipo}`;
   quantidadeCustomizada.value = quantidadeAtual;
-  posicionarMenuQuantidade();
+  posicionarMenuQuantidade(evento);
 }
 
 function abrirCombo(tipo) {
@@ -741,21 +741,21 @@ function renderNotas() {
     const statusTexto = status === "expedido" ? "Expedido" : "Pendente";
 
     tr.innerHTML = `
-      <td>
+      <td data-label="Cliente">
         <div class="cliente-cell">
           <strong>${nota.cliente}</strong>
           <span>${formatarData(nota.created_at)}</span>
         </div>
       </td>
-      <td>${nota.transportadora || "-"}</td>
-      <td>${nota.nf}</td>
-      <td>${nota.pedido}</td>
-      <td>${nota.volumes}</td>
-      <td>${formatarCaixas(nota.caixa)}</td>
-      <td>${formatarMoeda(nota.valor)}</td>
-      <td><span class="status-badge status-${status}">${statusTexto}</span></td>
-      <td><span class="tempo-pill">${calcularDiasNaExpedicao(nota.created_at)}</span></td>
-      <td>
+      <td data-label="Transportadora">${nota.transportadora || "-"}</td>
+      <td data-label="NF">${nota.nf}</td>
+      <td data-label="Pedido">${nota.pedido}</td>
+      <td data-label="Volumes">${nota.volumes}</td>
+      <td data-label="Caixa">${formatarCaixas(nota.caixa)}</td>
+      <td data-label="Valor">${formatarMoeda(nota.valor)}</td>
+      <td data-label="Status"><span class="status-badge status-${status}">${statusTexto}</span></td>
+      <td data-label="Dias"><span class="tempo-pill">${calcularDiasNaExpedicao(nota.created_at)}</span></td>
+      <td data-label="Ações">
         <div class="acoes-cell">
           <button class="table-action" onclick="editar(${nota.id})" type="button">Editar</button>
           <button class="table-action table-action-highlight" onclick="alternarExpedido(${nota.id}, ${nota.expedido})" type="button">
