@@ -32,9 +32,13 @@ const contadorFiltrado = document.getElementById("contadorFiltrado");
 const listaClientes = document.getElementById("listaClientes");
 const listaTransportadoras = document.getElementById("listaTransportadoras");
 const listaMotoristas = document.getElementById("listaMotoristas");
+const gridExpedicao = document.getElementById("gridExpedicao");
+const buscaExpedicao = document.getElementById("buscaExpedicao");
+const filtroExpedicao = document.getElementById("filtroExpedicao");
 const contadorClientes = document.getElementById("contadorClientes");
 const contadorTransportadoras = document.getElementById("contadorTransportadoras");
 const contadorMotoristas = document.getElementById("contadorMotoristas");
+const contadorExpedicaoGrid = document.getElementById("contadorExpedicaoGrid");
 
 const totalNotas = document.getElementById("totalNotas");
 const totalPendentes = document.getElementById("totalPendentes");
@@ -57,6 +61,7 @@ const VIEW_STATE_KEY = "expedicao.viewAtual";
 const CLIENTES_VISIBLE_KEY = "expedicao.clientesVisible";
 const TRANSPORTADORAS_VISIBLE_KEY = "expedicao.transportadorasVisible";
 const MOTORISTAS_VISIBLE_KEY = "expedicao.motoristasVisible";
+const EXPEDICAO_CONFIRMADA_STORAGE_KEY = "expedicao.confirmadas";
 
 const supabaseConfig = window.SUPABASE_CONFIG || {};
 const supabaseUrl = String(supabaseConfig.url || "").trim();
@@ -71,6 +76,7 @@ let motoristas = [];
 let editId = null;
 let chipCaixaAtivo = null;
 let comboAberto = null;
+let expedicoesConfirmadas = new Set();
 
 function gerarId() {
   return Date.now() + Math.floor(Math.random() * 1000);
@@ -91,6 +97,14 @@ function lerListaStorage(chave) {
 
 function salvarListaStorage(chave, lista) {
   localStorage.setItem(chave, JSON.stringify(lista));
+}
+
+function carregarExpedicoesConfirmadas() {
+  expedicoesConfirmadas = new Set(lerListaStorage(EXPEDICAO_CONFIRMADA_STORAGE_KEY).map(String));
+}
+
+function salvarExpedicoesConfirmadas() {
+  salvarListaStorage(EXPEDICAO_CONFIRMADA_STORAGE_KEY, Array.from(expedicoesConfirmadas));
 }
 
 function tratarErroBanco(error) {
@@ -386,7 +400,12 @@ function filtrarItensCombo(items, termo) {
 }
 
 function renderCombo(menu, items, tipo) {
-  const termo = tipo === "cliente" ? cliente.value : transportadora.value;
+  const campos = {
+    cliente,
+    transportadora
+  };
+  const campo = campos[tipo];
+  const termo = campo ? campo.value : "";
   const itensFiltrados = filtrarItensCombo(items, termo);
 
   menu.innerHTML = "";
@@ -402,10 +421,8 @@ function renderCombo(menu, items, tipo) {
     button.className = "combo-option";
     button.textContent = item;
     button.addEventListener("click", () => {
-      if (tipo === "cliente") {
-        cliente.value = item;
-      } else {
-        transportadora.value = item;
+      if (campo) {
+        campo.value = item;
       }
       fecharCombos();
     });
@@ -421,7 +438,7 @@ function alternarCombo(tipo) {
 
   if (tipo === "cliente") {
     renderCombo(menuClientes, clientes, "cliente");
-  } else {
+  } else if (tipo === "transportadora") {
     renderCombo(menuTransportadoras, transportadoras, "transportadora");
   }
 
@@ -718,6 +735,72 @@ function atualizarResumo() {
   valorTotal.textContent = formatarMoeda(somaValores);
 }
 
+function renderExpedicaoGrid() {
+  if (!gridExpedicao || !contadorExpedicaoGrid) return;
+
+  const notasExpedidas = notas.filter((nota) => nota.expedido);
+  const termo = buscaExpedicao ? buscaExpedicao.value.trim().toLowerCase() : "";
+  const filtro = filtroExpedicao ? filtroExpedicao.value : "todos";
+  const notasFiltradas = notasExpedidas.filter((nota) => {
+    const expedicaoConfirmada = expedicoesConfirmadas.has(String(nota.id));
+    const atendeBusca = !termo || [nota.cliente, nota.transportadora, nota.nf, nota.pedido].some((campo) => {
+      return String(campo).toLowerCase().includes(termo);
+    });
+    const atendeFiltro =
+      filtro === "todos" ||
+      (filtro === "pendente" && !expedicaoConfirmada) ||
+      (filtro === "expedido" && expedicaoConfirmada);
+
+    return atendeBusca && atendeFiltro;
+  });
+
+  contadorExpedicaoGrid.textContent = `${notasFiltradas.length} registro${notasFiltradas.length === 1 ? "" : "s"}`;
+
+  if (!notasFiltradas.length) {
+    gridExpedicao.innerHTML = `
+      <tr>
+        <td colspan="10" class="empty-state">
+          Nenhum registro expedido encontrado.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  gridExpedicao.innerHTML = notasFiltradas.map((nota) => {
+    const expedicaoConfirmada = expedicoesConfirmadas.has(String(nota.id));
+    const statusTexto = expedicaoConfirmada ? "Expedido" : "A expedir";
+
+    return `
+      <tr class="${expedicaoConfirmada ? "is-expedido" : ""}">
+        <td data-label="Cliente">
+          <div class="cliente-cell">
+            <strong>${nota.cliente}</strong>
+            <span>${formatarData(nota.created_at)}</span>
+          </div>
+        </td>
+        <td data-label="Transportadora">${nota.transportadora || "-"}</td>
+        <td data-label="NF">${nota.nf}</td>
+        <td data-label="Pedido">${nota.pedido}</td>
+        <td data-label="Volumes">${nota.volumes}</td>
+        <td data-label="Caixa">${formatarCaixas(nota.caixa) || "-"}</td>
+        <td data-label="Valor">${formatarMoeda(nota.valor)}</td>
+        <td data-label="Status">
+          <span class="status-badge ${expedicaoConfirmada ? "status-expedido" : "status-pendente"}">${statusTexto}</span>
+        </td>
+        <td data-label="Dias">
+          <span class="tempo-pill">${calcularDiasNaExpedicao(nota.created_at)}</span>
+        </td>
+        <td data-label="Expedir">
+          <button class="expedicao-btn" onclick="confirmarExpedicao(${nota.id})" type="button"${expedicaoConfirmada ? " disabled" : ""}>
+            ${expedicaoConfirmada ? "Expedido" : "Expedir"}
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
 function renderNotas() {
   const notasFiltradas = filtrarNotas();
   listaNotas.innerHTML = "";
@@ -732,6 +815,7 @@ function renderNotas() {
       </tr>
     `;
     atualizarResumo();
+    renderExpedicaoGrid();
     return;
   }
 
@@ -758,10 +842,10 @@ function renderNotas() {
       <td data-label="Ações">
         <div class="acoes-cell">
           <button class="table-action" onclick="editar(${nota.id})" type="button">Editar</button>
-          <button class="table-action table-action-highlight" onclick="alternarExpedido(${nota.id}, ${nota.expedido})" type="button">
-            ${nota.expedido ? "Reabrir" : "Expedir"}
-          </button>
           <button class="table-action table-action-danger" onclick="excluir(${nota.id})" type="button">Excluir</button>
+          <button class="table-action table-action-highlight" onclick="alternarExpedido(${nota.id}, ${nota.expedido})" type="button">
+            ${nota.expedido ? "Reabrir" : "Liberar para expedir"}
+          </button>
         </div>
       </td>
     `;
@@ -770,6 +854,7 @@ function renderNotas() {
   });
 
   atualizarResumo();
+  renderExpedicaoGrid();
 }
 
 async function salvarRegistro() {
@@ -892,6 +977,10 @@ window.alternarExpedido = async (id, estadoAtual) => {
         .eq("id", id);
 
       if (error) throw error;
+      if (estadoAtual) {
+        expedicoesConfirmadas.delete(String(id));
+        salvarExpedicoesConfirmadas();
+      }
       mostrarToast(!estadoAtual ? "Registro marcado como expedido." : "Registro reaberto.", "sucesso");
       await carregarNotas();
     } catch (error) {
@@ -900,10 +989,21 @@ window.alternarExpedido = async (id, estadoAtual) => {
     return;
   }
 
+  if (estadoAtual) {
+    expedicoesConfirmadas.delete(String(id));
+    salvarExpedicoesConfirmadas();
+  }
   notas = notas.map((nota) => (nota.id === id ? { ...nota, expedido: !estadoAtual } : nota));
   salvarNotas();
   mostrarToast(!estadoAtual ? "Registro marcado como expedido." : "Registro reaberto.", "sucesso");
   carregarNotas();
+};
+
+window.confirmarExpedicao = (id) => {
+  expedicoesConfirmadas.add(String(id));
+  salvarExpedicoesConfirmadas();
+  renderExpedicaoGrid();
+  mostrarToast("Card marcado como expedido.", "sucesso");
 };
 
 function gerarPDF() {
@@ -951,6 +1051,8 @@ btnToggleTransportadoras.addEventListener("click", () => toggleListaCadastros("t
 btnToggleMotoristas.addEventListener("click", () => toggleListaCadastros("motoristas"));
 buscaNotas.addEventListener("input", renderNotas);
 filtroStatus.addEventListener("change", renderNotas);
+buscaExpedicao.addEventListener("input", renderExpedicaoGrid);
+filtroExpedicao.addEventListener("change", renderExpedicaoGrid);
 btnSair.addEventListener("click", () => {
   mostrarToast("Ação de saída reservada para a futura autenticação.", "aviso");
 });
@@ -1023,6 +1125,7 @@ async function iniciarSistema() {
   carregarEstadoSidebar();
   carregarEstadoFormulario();
   carregarEstadoListas();
+  carregarExpedicoesConfirmadas();
   carregarView();
   await carregarCadastros();
   await carregarNotas();

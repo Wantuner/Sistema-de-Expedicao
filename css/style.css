@@ -1166,6 +1166,75 @@ body.sidebar-collapsed.formulario-retraido .table-action {
   color: var(--muted);
 }
 
+.expedicao-panel {
+  min-height: calc(100vh - 56px);
+}
+
+.expedicao-toolbar {
+  margin-bottom: 18px;
+}
+
+.expedicao-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+}
+
+.expedicao-table th,
+.expedicao-table td {
+  padding: 16px 14px;
+  border-bottom: 1px solid rgba(110, 98, 84, 0.08);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.expedicao-table thead th {
+  position: sticky;
+  top: 0;
+  background: rgba(248, 245, 238, 0.96);
+  color: var(--muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.expedicao-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.expedicao-table tbody tr:hover {
+  background: rgba(88, 194, 191, 0.06);
+}
+
+.expedicao-table tbody tr.is-expedido {
+  background: linear-gradient(135deg, rgba(88, 194, 191, 0.22), rgba(217, 255, 99, 0.12));
+}
+
+.expedicao-btn {
+  min-height: 34px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(88, 194, 191, 0.2);
+  color: #0b6d6b;
+  cursor: pointer;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: transform 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.expedicao-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(88, 194, 191, 0.32);
+  box-shadow: 0 10px 18px rgba(31, 140, 119, 0.12);
+}
+
+.expedicao-btn:disabled {
+  cursor: default;
+  background: rgba(31, 140, 119, 0.18);
+  color: #0f6b5d;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -1514,6 +1583,14 @@ body.sidebar-collapsed.formulario-retraido .table-action {
   .status-badge {
     min-width: 0;
     width: fit-content;
+  }
+
+  .expedicao-panel {
+    min-height: auto;
+  }
+
+  .expedicao-table {
+    min-width: 900px;
   }
 
   .sidebar-fab {

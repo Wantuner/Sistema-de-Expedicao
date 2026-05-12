@@ -334,12 +334,47 @@
       </section>
 
       <section class="view-section" id="view-expedicao">
-        <section class="panel placeholder-panel">
-          <p class="eyebrow">Próxima etapa</p>
-          <h2>Expedição</h2>
-          <p class="hero-copy">
-            Esta área fica reservada para as próximas telas operacionais do fluxo de expedição.
-          </p>
+        <section class="panel expedicao-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Fila operacional</p>
+              <h2>Expedição</h2>
+            </div>
+            <span id="contadorExpedicaoGrid" class="panel-chip">0 registros</span>
+          </div>
+
+          <div class="toolbar expedicao-toolbar">
+            <label class="search-box">
+              <span class="sr-only">Buscar na expedição por cliente, transportadora, nota ou pedido</span>
+              <input id="buscaExpedicao" type="search" placeholder="Buscar cliente, NF ou pedido">
+            </label>
+
+            <select id="filtroExpedicao" class="status-filter">
+              <option value="todos">Todos</option>
+              <option value="pendente">A expedir</option>
+              <option value="expedido">Expedidos</option>
+            </select>
+          </div>
+
+          <div class="table-wrap expedicao-table-wrap">
+            <table class="expedicao-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Transportadora</th>
+                  <th>NF</th>
+                  <th>Pedido</th>
+                  <th>Volumes</th>
+                  <th>Caixa</th>
+                  <th>Valor</th>
+                  <th>Status</th>
+                  <th>Dias</th>
+                  <th>Expedir</th>
+                </tr>
+              </thead>
+              <tbody id="gridExpedicao"></tbody>
+            </table>
+          </div>
         </section>
       </section>
     </main>
