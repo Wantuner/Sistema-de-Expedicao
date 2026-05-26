@@ -223,6 +223,24 @@ function formatarData(data) {
   return new Date(data).toLocaleDateString("pt-BR");
 }
 
+function formatarNomeCurto(nome) {
+  const texto = String(nome || "").trim();
+  if (!texto) return "-";
+
+  const palavras = texto.split(/\s+/);
+  return palavras.length > 2 ? palavras.slice(0, 2).join(" ") : texto;
+}
+
+function escaparHtml(valor) {
+  return String(valor ?? "").replace(/[&<>"']/g, (caractere) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  }[caractere]));
+}
+
 function calcularDiasNaExpedicao(dataCriacao) {
   const hoje = new Date();
   const dataNota = new Date(dataCriacao);
@@ -770,16 +788,20 @@ function renderExpedicaoGrid() {
   gridExpedicao.innerHTML = notasFiltradas.map((nota) => {
     const expedicaoConfirmada = expedicoesConfirmadas.has(String(nota.id));
     const statusTexto = expedicaoConfirmada ? "Expedido" : "A expedir";
+    const clienteCompleto = escaparHtml(nota.cliente || "-");
+    const clienteCurto = escaparHtml(formatarNomeCurto(nota.cliente));
+    const transportadoraCompleta = escaparHtml(nota.transportadora || "-");
+    const transportadoraCurta = escaparHtml(formatarNomeCurto(nota.transportadora));
 
     return `
       <tr class="${expedicaoConfirmada ? "is-expedido" : ""}">
         <td data-label="Cliente">
           <div class="cliente-cell">
-            <strong>${nota.cliente}</strong>
+            <strong title="${clienteCompleto}">${clienteCurto}</strong>
             <span>${formatarData(nota.created_at)}</span>
           </div>
         </td>
-        <td data-label="Transportadora">${nota.transportadora || "-"}</td>
+        <td data-label="Transportadora" title="${transportadoraCompleta}">${transportadoraCurta}</td>
         <td data-label="NF">${nota.nf}</td>
         <td data-label="Pedido">${nota.pedido}</td>
         <td data-label="Volumes">${nota.volumes}</td>
@@ -823,15 +845,19 @@ function renderNotas() {
     const tr = document.createElement("tr");
     const status = obterStatus(nota);
     const statusTexto = status === "expedido" ? "Expedido" : "Pendente";
+    const clienteCompleto = escaparHtml(nota.cliente || "-");
+    const clienteCurto = escaparHtml(formatarNomeCurto(nota.cliente));
+    const transportadoraCompleta = escaparHtml(nota.transportadora || "-");
+    const transportadoraCurta = escaparHtml(formatarNomeCurto(nota.transportadora));
 
     tr.innerHTML = `
       <td data-label="Cliente">
         <div class="cliente-cell">
-          <strong>${nota.cliente}</strong>
+          <strong title="${clienteCompleto}">${clienteCurto}</strong>
           <span>${formatarData(nota.created_at)}</span>
         </div>
       </td>
-      <td data-label="Transportadora">${nota.transportadora || "-"}</td>
+      <td data-label="Transportadora" title="${transportadoraCompleta}">${transportadoraCurta}</td>
       <td data-label="NF">${nota.nf}</td>
       <td data-label="Pedido">${nota.pedido}</td>
       <td data-label="Volumes">${nota.volumes}</td>
