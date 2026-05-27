@@ -161,6 +161,11 @@
               </label>
 
               <label class="field">
+                <span>Endereço</span>
+                <input id="endereco" autocomplete="off" placeholder="Digite o endereço de entrega">
+              </label>
+
+              <label class="field">
                 <span>Caixa</span>
                 <div class="checkbox-group" id="caixa">
                   <label class="checkbox-chip">
@@ -194,7 +199,6 @@
               <div class="form-actions">
                 <button id="btnLimpar" class="btn btn-muted" type="button">Limpar</button>
                 <button id="btnAdicionar" class="btn btn-primary" type="button">Salvar</button>
-                <button id="btnPDF" class="btn btn-secondary" type="button">Gerar PDF</button>
               </div>
             </form>
           </section>
@@ -205,7 +209,10 @@
                 <p class="eyebrow">Monitoramento</p>
                 <h2>Fila de expedição</h2>
               </div>
-              <span id="contadorFiltrado" class="panel-chip">0 registros</span>
+              <div class="panel-heading-actions">
+                <span id="contadorFiltrado" class="panel-chip panel-chip-hidden">0 registros</span>
+                <button id="btnPDF" class="btn btn-secondary" type="button">Gerar PDF</button>
+              </div>
             </div>
 
             <div class="toolbar">
@@ -227,6 +234,7 @@
                   <tr>
                     <th>Cliente</th>
                     <th>Transportadora</th>
+                    <th>Endereço</th>
                     <th>NF</th>
                     <th>Pedido</th>
                     <th>Volumes</th>
@@ -346,7 +354,7 @@
           <div class="toolbar expedicao-toolbar">
             <label class="search-box">
               <span class="sr-only">Buscar na expedição por cliente, transportadora, nota ou pedido</span>
-              <input id="buscaExpedicao" type="search" placeholder="Buscar cliente, NF ou pedido">
+              <input id="buscaExpedicao" type="search" placeholder="Buscar cliente, endereco, NF ou pedido">
             </label>
 
             <select id="filtroExpedicao" class="status-filter">
@@ -362,6 +370,7 @@
                 <tr>
                   <th>Cliente</th>
                   <th>Transportadora</th>
+                  <th>Endereço</th>
                   <th>NF</th>
                   <th>Pedido</th>
                   <th>Volumes</th>

@@ -6,6 +6,7 @@ const nf = document.getElementById("nf");
 const pedido = document.getElementById("pedido");
 const volumes = document.getElementById("volumes");
 const valor = document.getElementById("valor");
+const endereco = document.getElementById("endereco");
 
 const btnAdicionar = document.getElementById("btnAdicionar");
 const btnLimpar = document.getElementById("btnLimpar");
@@ -62,10 +63,12 @@ const CLIENTES_VISIBLE_KEY = "expedicao.clientesVisible";
 const TRANSPORTADORAS_VISIBLE_KEY = "expedicao.transportadorasVisible";
 const MOTORISTAS_VISIBLE_KEY = "expedicao.motoristasVisible";
 const EXPEDICAO_CONFIRMADA_STORAGE_KEY = "expedicao.confirmadas";
+const TABELA_NOTAS = "notas";
 
 const supabaseConfig = window.SUPABASE_CONFIG || {};
 const supabaseUrl = String(supabaseConfig.url || "").trim();
 const supabaseAnonKey = String(supabaseConfig.anonKey || "").trim();
+const googleMapsApiKey = String(supabaseConfig.googleMapsApiKey || "").trim();
 const bancoSupabaseAtivo = Boolean(window.supabase && supabaseUrl && supabaseAnonKey);
 const banco = bancoSupabaseAtivo ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null;
 
@@ -221,6 +224,38 @@ function formatarMoeda(valorMonetario) {
 
 function formatarData(data) {
   return new Date(data).toLocaleDateString("pt-BR");
+}
+
+function inicializarAutocompleteEndereco() {
+  if (!endereco || !window.google?.maps?.places) return;
+
+  const autocomplete = new google.maps.places.Autocomplete(endereco, {
+    componentRestrictions: { country: "br" },
+    fields: ["formatted_address", "name"],
+    types: ["address"]
+  });
+
+  autocomplete.addListener("place_changed", () => {
+    const place = autocomplete.getPlace();
+    endereco.value = place.formatted_address || place.name || endereco.value;
+  });
+}
+
+function carregarGooglePlaces() {
+  if (!endereco || !googleMapsApiKey) return;
+  if (window.google?.maps?.places) {
+    inicializarAutocompleteEndereco();
+    return;
+  }
+
+  window.inicializarAutocompleteEndereco = inicializarAutocompleteEndereco;
+
+  const script = document.createElement("script");
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(googleMapsApiKey)}&libraries=places&callback=inicializarAutocompleteEndereco`;
+  script.async = true;
+  script.defer = true;
+  script.onerror = () => mostrarToast("Nao foi possivel carregar os enderecos do Google.", "erro");
+  document.head.appendChild(script);
 }
 
 function formatarNomeCurto(nome) {
@@ -679,7 +714,7 @@ async function carregarNotas() {
   if (bancoSupabaseAtivo) {
     try {
       const { data, error } = await banco
-        .from("notas")
+        .from(TABELA_NOTAS)
         .select("*")
         .order("created_at", { ascending: false });
 
@@ -707,6 +742,7 @@ function obterDadosFormulario() {
     pedido: pedido.value.trim(),
     volumes: Number(volumes.value),
     valor: Number(valor.value),
+    endereco: endereco.value.trim(),
     caixa: obterCaixasSelecionadas()
   };
 }
@@ -718,6 +754,7 @@ function limparFormulario() {
   pedido.value = "";
   volumes.value = "";
   valor.value = "";
+  endereco.value = "";
   definirCaixasSelecionadas([]);
   editId = null;
 }
@@ -731,7 +768,7 @@ function filtrarNotas() {
   const statusSelecionado = filtroStatus.value;
 
   return notas.filter((nota) => {
-    const atendeBusca = !termo || [nota.cliente, nota.transportadora, nota.nf, nota.pedido].some((campo) => {
+    const atendeBusca = !termo || [nota.cliente, nota.transportadora, nota.endereco, nota.nf, nota.pedido].some((campo) => {
       return String(campo).toLowerCase().includes(termo);
     });
 
@@ -761,7 +798,7 @@ function renderExpedicaoGrid() {
   const filtro = filtroExpedicao ? filtroExpedicao.value : "todos";
   const notasFiltradas = notasExpedidas.filter((nota) => {
     const expedicaoConfirmada = expedicoesConfirmadas.has(String(nota.id));
-    const atendeBusca = !termo || [nota.cliente, nota.transportadora, nota.nf, nota.pedido].some((campo) => {
+    const atendeBusca = !termo || [nota.cliente, nota.transportadora, nota.endereco, nota.nf, nota.pedido].some((campo) => {
       return String(campo).toLowerCase().includes(termo);
     });
     const atendeFiltro =
@@ -777,7 +814,7 @@ function renderExpedicaoGrid() {
   if (!notasFiltradas.length) {
     gridExpedicao.innerHTML = `
       <tr>
-        <td colspan="10" class="empty-state">
+        <td colspan="11" class="empty-state">
           Nenhum registro expedido encontrado.
         </td>
       </tr>
@@ -792,6 +829,7 @@ function renderExpedicaoGrid() {
     const clienteCurto = escaparHtml(formatarNomeCurto(nota.cliente));
     const transportadoraCompleta = escaparHtml(nota.transportadora || "-");
     const transportadoraCurta = escaparHtml(formatarNomeCurto(nota.transportadora));
+    const enderecoCompleto = escaparHtml(nota.endereco || "-");
 
     return `
       <tr class="${expedicaoConfirmada ? "is-expedido" : ""}">
@@ -802,6 +840,9 @@ function renderExpedicaoGrid() {
           </div>
         </td>
         <td data-label="Transportadora" title="${transportadoraCompleta}">${transportadoraCurta}</td>
+        <td data-label="Endereço" title="${enderecoCompleto}">
+          <span class="endereco-cell">${enderecoCompleto}</span>
+        </td>
         <td data-label="NF">${nota.nf}</td>
         <td data-label="Pedido">${nota.pedido}</td>
         <td data-label="Volumes">${nota.volumes}</td>
@@ -831,7 +872,7 @@ function renderNotas() {
   if (!notasFiltradas.length) {
     listaNotas.innerHTML = `
       <tr>
-        <td colspan="10" class="empty-state">
+        <td colspan="11" class="empty-state">
           Nenhum registro encontrado com os filtros atuais.
         </td>
       </tr>
@@ -849,6 +890,7 @@ function renderNotas() {
     const clienteCurto = escaparHtml(formatarNomeCurto(nota.cliente));
     const transportadoraCompleta = escaparHtml(nota.transportadora || "-");
     const transportadoraCurta = escaparHtml(formatarNomeCurto(nota.transportadora));
+    const enderecoCompleto = escaparHtml(nota.endereco || "-");
 
     tr.innerHTML = `
       <td data-label="Cliente">
@@ -858,6 +900,9 @@ function renderNotas() {
         </div>
       </td>
       <td data-label="Transportadora" title="${transportadoraCompleta}">${transportadoraCurta}</td>
+      <td data-label="Endereço" title="${enderecoCompleto}">
+        <span class="endereco-cell endereco-cell-curto">${escaparHtml(formatarNomeCurto(nota.endereco))}</span>
+      </td>
       <td data-label="NF">${nota.nf}</td>
       <td data-label="Pedido">${nota.pedido}</td>
       <td data-label="Volumes">${nota.volumes}</td>
@@ -870,7 +915,7 @@ function renderNotas() {
           <button class="table-action" onclick="editar(${nota.id})" type="button">Editar</button>
           <button class="table-action table-action-danger" onclick="excluir(${nota.id})" type="button">Excluir</button>
           <button class="table-action table-action-highlight" onclick="alternarExpedido(${nota.id}, ${nota.expedido})" type="button">
-            ${nota.expedido ? "Reabrir" : "Liberar para expedir"}
+            ${nota.expedido ? "Reabrir" : "Liberar"}
           </button>
         </div>
       </td>
@@ -909,19 +954,24 @@ async function salvarRegistro() {
 
   if (bancoSupabaseAtivo) {
     try {
+      const dadosBanco = { ...dados };
+      if (!dadosBanco.endereco) {
+        delete dadosBanco.endereco;
+      }
+
       if (editId) {
         const { error } = await banco
-          .from("notas")
-          .update(dados)
+          .from(TABELA_NOTAS)
+          .update(dadosBanco)
           .eq("id", editId);
 
         if (error) throw error;
         mostrarToast("Registro atualizado com sucesso.", "sucesso");
       } else {
         const { error } = await banco
-          .from("notas")
+          .from(TABELA_NOTAS)
           .insert({
-            ...dados,
+            ...dadosBanco,
             expedido: false
           });
 
@@ -965,6 +1015,7 @@ window.editar = (id) => {
   pedido.value = nota.pedido;
   volumes.value = nota.volumes;
   valor.value = nota.valor;
+  endereco.value = nota.endereco || "";
   definirCaixasSelecionadas(nota.caixa);
   editId = id;
   navegarPara("painel");
@@ -978,7 +1029,7 @@ window.excluir = async (id) => {
 
   if (bancoSupabaseAtivo) {
     try {
-      const { error } = await banco.from("notas").delete().eq("id", id);
+      const { error } = await banco.from(TABELA_NOTAS).delete().eq("id", id);
       if (error) throw error;
       mostrarToast("Registro excluido.", "aviso");
       await carregarNotas();
@@ -998,7 +1049,7 @@ window.alternarExpedido = async (id, estadoAtual) => {
   if (bancoSupabaseAtivo) {
     try {
       const { error } = await banco
-        .from("notas")
+        .from(TABELA_NOTAS)
         .update({ expedido: !estadoAtual })
         .eq("id", id);
 
@@ -1155,6 +1206,7 @@ async function iniciarSistema() {
   carregarView();
   await carregarCadastros();
   await carregarNotas();
+  carregarGooglePlaces();
 }
 
 iniciarSistema();

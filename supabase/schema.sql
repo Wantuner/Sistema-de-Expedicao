@@ -33,11 +33,15 @@ create table if not exists public.notas (
   pedido text not null,
   volumes integer not null check (volumes > 0),
   valor numeric(12, 2) not null check (valor >= 0),
+  endereco text,
   caixa jsonb not null default '[]'::jsonb,
   expedido boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.notas
+  add column if not exists endereco text;
 
 create unique index if not exists notas_nf_unica
   on public.notas (nf);

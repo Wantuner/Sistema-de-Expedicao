@@ -646,6 +646,16 @@ body.formulario-retraido .content-grid {
   white-space: nowrap;
 }
 
+.panel-heading-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel-chip-hidden {
+  display: none;
+}
+
 .formulario {
   display: grid;
   gap: 16px;
@@ -1031,7 +1041,7 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
 .notas-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 960px;
+  min-width: 1100px;
 }
 
 .notas-table th,
@@ -1176,7 +1186,7 @@ body.sidebar-collapsed.formulario-retraido .table-action {
 
 .expedicao-table {
   width: 100%;
-  min-width: 980px;
+  min-width: 1120px;
   border-collapse: collapse;
 }
 
@@ -1208,6 +1218,17 @@ body.sidebar-collapsed.formulario-retraido .table-action {
 
 .expedicao-table tbody tr.is-expedido {
   background: linear-gradient(135deg, rgba(88, 194, 191, 0.22), rgba(217, 255, 99, 0.12));
+}
+
+.endereco-cell {
+  display: inline-block;
+  max-width: 240px;
+  line-height: 1.35;
+}
+
+.endereco-cell-curto {
+  max-width: 160px;
+  white-space: nowrap;
 }
 
 .expedicao-btn {
@@ -1590,7 +1611,7 @@ body.sidebar-collapsed.formulario-retraido .table-action {
   }
 
   .expedicao-table {
-    min-width: 900px;
+    min-width: 1040px;
   }
 
   .sidebar-fab {
