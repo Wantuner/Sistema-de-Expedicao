@@ -64,6 +64,7 @@ const TRANSPORTADORAS_VISIBLE_KEY = "expedicao.transportadorasVisible";
 const MOTORISTAS_VISIBLE_KEY = "expedicao.motoristasVisible";
 const EXPEDICAO_CONFIRMADA_STORAGE_KEY = "expedicao.confirmadas";
 const TABELA_NOTAS = "notas";
+const MODELO_ROMANEIO_PATH = "assets/Modelo.docx";
 
 const supabaseConfig = window.SUPABASE_CONFIG || {};
 const supabaseUrl = String(supabaseConfig.url || "").trim();
@@ -274,6 +275,21 @@ function escaparHtml(valor) {
     "\"": "&quot;",
     "'": "&#39;"
   }[caractere]));
+}
+
+function escaparXml(valor) {
+  return String(valor ?? "").replace(/[&<>"']/g, (caractere) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&apos;"
+  }[caractere]));
+}
+
+function formatarNomeArquivo(valor) {
+  const nome = String(valor || "").trim().replace(/[\\/:*?"<>|]+/g, "-");
+  return nome || "romaneio";
 }
 
 function calcularDiasNaExpedicao(dataCriacao) {
@@ -917,6 +933,7 @@ function renderNotas() {
           <button class="table-action table-action-highlight" onclick="alternarExpedido(${nota.id}, ${nota.expedido})" type="button">
             ${nota.expedido ? "Reabrir" : "Liberar"}
           </button>
+          <button class="table-action table-action-secondary" onclick="gerarRomaneio(${nota.id})" type="button">Romaneio</button>
         </div>
       </td>
     `;
@@ -1113,6 +1130,64 @@ function gerarPDF() {
 
   doc.save("relatorio-expedicao.pdf");
 }
+
+window.gerarRomaneio = async (id) => {
+  const nota = notas.find((item) => String(item.id) === String(id));
+  if (!nota) {
+    mostrarToast("Registro nao encontrado para gerar romaneio.", "erro");
+    return;
+  }
+
+  if (!window.JSZip) {
+    mostrarToast("Biblioteca para gerar DOCX nao carregada.", "erro");
+    return;
+  }
+
+  try {
+    const resposta = await fetch(MODELO_ROMANEIO_PATH);
+    if (!resposta.ok) throw new Error("Modelo nao encontrado.");
+
+    const zip = await JSZip.loadAsync(await resposta.arrayBuffer());
+    const documento = zip.file("word/document.xml");
+    if (!documento) throw new Error("Documento invalido.");
+
+    const substituicoes = [
+      nota.nf,
+      nota.pedido,
+      nota.cliente,
+      nota.endereco || "-",
+      nota.transportadora || "-"
+    ].map(escaparXml);
+
+    let indice = 0;
+    const xmlAtualizado = (await documento.async("string")).replace(/\*{3,}/g, (placeholder) => {
+      if (indice >= substituicoes.length) return placeholder;
+      const valor = substituicoes[indice];
+      indice += 1;
+      return valor;
+    });
+
+    zip.file("word/document.xml", xmlAtualizado);
+
+    const blob = await zip.generateAsync({
+      type: "blob",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    });
+
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = `${formatarNomeArquivo(`romaneio-${nota.nf || nota.pedido}`)}.docx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    mostrarToast("Romaneio gerado com sucesso.", "sucesso");
+  } catch (error) {
+    console.error("Erro ao gerar romaneio:", error);
+    mostrarToast("Nao foi possivel gerar o romaneio.", "erro");
+  }
+};
 
 btnAdicionar.addEventListener("click", salvarRegistro);
 btnLimpar.addEventListener("click", limparFormulario);

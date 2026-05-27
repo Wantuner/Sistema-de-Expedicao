@@ -1142,6 +1142,11 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
   background: linear-gradient(135deg, var(--accent) 0%, #f0ff9d 100%);
 }
 
+.table-action-secondary {
+  background: rgba(88, 194, 191, 0.16);
+  color: #0b6d6b;
+}
+
 .table-action-danger {
   background: rgba(202, 90, 82, 0.12);
   color: var(--danger);
