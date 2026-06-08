@@ -1234,6 +1234,8 @@ body.sidebar-collapsed.formulario-retraido .table-action {
 .endereco-cell-curto {
   max-width: 160px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .expedicao-btn {

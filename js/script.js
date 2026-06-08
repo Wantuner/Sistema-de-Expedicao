@@ -857,7 +857,7 @@ function renderExpedicaoGrid() {
         </td>
         <td data-label="Transportadora" title="${transportadoraCompleta}">${transportadoraCurta}</td>
         <td data-label="Endereço" title="${enderecoCompleto}">
-          <span class="endereco-cell">${enderecoCompleto}</span>
+          <span class="endereco-cell endereco-cell-curto">${escaparHtml(formatarNomeCurto(nota.endereco))}</span>
         </td>
         <td data-label="NF">${nota.nf}</td>
         <td data-label="Pedido">${nota.pedido}</td>
