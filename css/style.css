@@ -1070,6 +1070,10 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
   background: rgba(88, 194, 191, 0.06);
 }
 
+.notas-table tbody tr.is-expedido {
+  background: rgba(88, 194, 191, 0.12);
+}
+
 .cliente-cell {
   display: grid;
   gap: 4px;
@@ -1234,8 +1238,6 @@ body.sidebar-collapsed.formulario-retraido .table-action {
 .endereco-cell-curto {
   max-width: 160px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .expedicao-btn {

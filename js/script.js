@@ -871,8 +871,8 @@ function renderExpedicaoGrid() {
           <span class="tempo-pill">${calcularDiasNaExpedicao(nota.created_at)}</span>
         </td>
         <td data-label="Expedir">
-          <button class="expedicao-btn" onclick="confirmarExpedicao(${nota.id})" type="button"${expedicaoConfirmada ? " disabled" : ""}>
-            ${expedicaoConfirmada ? "Expedido" : "Expedir"}
+          <button class="expedicao-btn" onclick="confirmarExpedicao(${nota.id})" type="button">
+              ${expedicaoConfirmada ? "Reabrir" : "Liberar"}
           </button>
         </td>
       </tr>
@@ -931,12 +931,16 @@ function renderNotas() {
           <button class="table-action" onclick="editar(${nota.id})" type="button">Editar</button>
           <button class="table-action table-action-danger" onclick="excluir(${nota.id})" type="button">Excluir</button>
           <button class="table-action table-action-highlight" onclick="alternarExpedido(${nota.id}, ${nota.expedido})" type="button">
-            ${nota.expedido ? "Reabrir" : "Liberar"}
+            ${nota.expedido ? "Expedido" : "Expedir"}
           </button>
           <button class="table-action table-action-secondary" onclick="gerarRomaneio(${nota.id})" type="button">Romaneio</button>
         </div>
       </td>
     `;
+
+    if (status === "expedido") {
+      tr.classList.add("is-expedido");
+    }
 
     listaNotas.appendChild(tr);
   });
@@ -1094,10 +1098,16 @@ window.alternarExpedido = async (id, estadoAtual) => {
 };
 
 window.confirmarExpedicao = (id) => {
-  expedicoesConfirmadas.add(String(id));
+  const idStr = String(id);
+  if (expedicoesConfirmadas.has(idStr)) {
+    expedicoesConfirmadas.delete(idStr);
+    mostrarToast("Card desmarcado como expedido.", "sucesso");
+  } else {
+    expedicoesConfirmadas.add(idStr);
+    mostrarToast("Card marcado como expedido.", "sucesso");
+  }
   salvarExpedicoesConfirmadas();
   renderExpedicaoGrid();
-  mostrarToast("Card marcado como expedido.", "sucesso");
 };
 
 function gerarPDF() {
