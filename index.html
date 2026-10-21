@@ -12,7 +12,27 @@
   <script src="vendor/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
-  <div class="app-shell">
+  <main class="login-screen" id="loginScreen">
+    <form class="login-card" id="loginForm">
+      <img class="login-logo" src="./assets/icone-rolimec.png" alt="Logo Rolimec">
+      <p class="eyebrow">Central de Expedição</p>
+      <h1>Acesse sua filial</h1>
+      <p class="login-description">Entre com seu e-mail e senha corporativos.</p>
+      <label class="field">
+        <span>E-mail</span>
+        <input id="loginEmail" type="email" autocomplete="username" required>
+      </label>
+      <label class="field">
+        <span>Senha</span>
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </label>
+      <p class="login-error" id="loginError" role="alert" aria-live="polite"></p>
+      <button class="btn btn-primary login-submit" id="btnEntrar" type="submit">Entrar</button>
+      <p class="login-help" id="loginHelp">As contas são criadas pelo administrador do sistema.</p>
+    </form>
+  </main>
+
+  <div class="app-shell" id="appShell" hidden>
     <aside class="sidebar" id="sidebar">
       <div class="brand">
         <button class="brand-toggle" id="btnToggleSidebar" type="button" aria-expanded="true" aria-controls="sidebar" aria-label="Ocultar menu lateral">
@@ -22,7 +42,7 @@
         </button>
         <div class="brand-copy">
           <strong>Expedição</strong>
-          <span>Nova base operacional</span>
+          <span id="nomeFilial">Base operacional</span>
         </div>
       </div>
 
@@ -59,8 +79,8 @@
             <img src="./assets/perfil_ce.png" alt="Foto de Perfil">
           </div>
           <div class="profile-copy">
-            <strong id="usuarioLogado">rolimec.ce</strong>
-            <span>Perfil operacional</span>
+            <strong id="usuarioLogado">Usuário</strong>
+            <span id="filialLogada">Filial</span>
           </div>
         </div>
         <button class="session-exit sidebar-exit" id="btnSair" type="button" aria-label="Sair" title="Sair">

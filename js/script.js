@@ -21,6 +21,17 @@ const btnSalvarMotorista = document.getElementById("btnSalvarMotorista");
 const btnToggleClientes = document.getElementById("btnToggleClientes");
 const btnToggleTransportadoras = document.getElementById("btnToggleTransportadoras");
 const btnToggleMotoristas = document.getElementById("btnToggleMotoristas");
+const loginScreen = document.getElementById("loginScreen");
+const loginForm = document.getElementById("loginForm");
+const loginEmail = document.getElementById("loginEmail");
+const loginPassword = document.getElementById("loginPassword");
+const loginError = document.getElementById("loginError");
+const loginHelp = document.getElementById("loginHelp");
+const btnEntrar = document.getElementById("btnEntrar");
+const appShell = document.getElementById("appShell");
+const usuarioLogado = document.getElementById("usuarioLogado");
+const nomeFilial = document.getElementById("nomeFilial");
+const filialLogada = document.getElementById("filialLogada");
 
 const nomeClienteCadastro = document.getElementById("nomeClienteCadastro");
 const nomeTransportadoraCadastro = document.getElementById("nomeTransportadoraCadastro");
@@ -73,6 +84,7 @@ const googleMapsApiKey = String(supabaseConfig.googleMapsApiKey || "").trim();
 const bancoSupabaseAtivo = Boolean(window.supabase && supabaseUrl && supabaseAnonKey);
 const banco = bancoSupabaseAtivo ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null;
 
+let perfilAtual = null;
 let notas = [];
 let clientes = [];
 let transportadoras = [];
@@ -104,11 +116,57 @@ function salvarListaStorage(chave, lista) {
 }
 
 function carregarExpedicoesConfirmadas() {
-  expedicoesConfirmadas = new Set(lerListaStorage(EXPEDICAO_CONFIRMADA_STORAGE_KEY).map(String));
+  const chave = `${EXPEDICAO_CONFIRMADA_STORAGE_KEY}.${perfilAtual?.filial_id || "sem-filial"}`;
+  expedicoesConfirmadas = new Set(lerListaStorage(chave).map(String));
 }
 
 function salvarExpedicoesConfirmadas() {
-  salvarListaStorage(EXPEDICAO_CONFIRMADA_STORAGE_KEY, Array.from(expedicoesConfirmadas));
+  const chave = `${EXPEDICAO_CONFIRMADA_STORAGE_KEY}.${perfilAtual?.filial_id || "sem-filial"}`;
+  salvarListaStorage(chave, Array.from(expedicoesConfirmadas));
+}
+
+function mostrarTelaLogin(mensagem = "") {
+  perfilAtual = null;
+  appShell.hidden = true;
+  loginScreen.hidden = false;
+  loginError.textContent = mensagem;
+}
+
+async function carregarPerfilUsuario(usuario) {
+  const { data, error } = await banco
+    .from("perfis")
+    .select("filial_id, filiais(nome)")
+    .eq("id", usuario.id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.filial_id || !data.filiais?.nome) {
+    throw new Error("Sua conta ainda não está vinculada a uma filial. Solicite acesso ao administrador.");
+  }
+
+  perfilAtual = data;
+  usuarioLogado.textContent = usuario.email || "Usuário";
+  nomeFilial.textContent = data.filiais.nome;
+  filialLogada.textContent = data.filiais.nome;
+}
+
+async function entrarNaAplicacao(session) {
+  try {
+    await carregarPerfilUsuario(session.user);
+    await iniciarSistema();
+    loginScreen.hidden = true;
+    appShell.hidden = false;
+    loginError.textContent = "";
+  } catch (error) {
+    console.error("Erro ao carregar o perfil da filial:", error);
+    try {
+      const { error: signOutError } = await banco.auth.signOut();
+      if (signOutError) console.error("Erro ao encerrar a sessão sem filial:", signOutError);
+    } catch (signOutError) {
+      console.error("Erro ao encerrar a sessão sem filial:", signOutError);
+    }
+    mostrarTelaLogin(error.message || "Não foi possível carregar o acesso da filial.");
+  }
 }
 
 function tratarErroBanco(error) {
@@ -552,17 +610,13 @@ function renderCadastros() {
 
 async function carregarCadastros() {
   if (bancoSupabaseAtivo) {
-    try {
-      [clientes, transportadoras, motoristas] = await Promise.all([
-        carregarNomesTabela("clientes"),
-        carregarNomesTabela("transportadoras"),
-        carregarNomesTabela("motoristas")
-      ]);
-      renderCadastros();
-      return;
-    } catch (error) {
-      tratarErroBanco(error);
-    }
+    [clientes, transportadoras, motoristas] = await Promise.all([
+      carregarNomesTabela("clientes"),
+      carregarNomesTabela("transportadoras"),
+      carregarNomesTabela("motoristas")
+    ]);
+    renderCadastros();
+    return;
   }
 
   clientes = lerListaStorage(CLIENTES_STORAGE_KEY).sort((a, b) => a.localeCompare(b));
@@ -728,22 +782,18 @@ function salvarNotas() {
 
 async function carregarNotas() {
   if (bancoSupabaseAtivo) {
-    try {
-      const { data, error } = await banco
-        .from(TABELA_NOTAS)
-        .select("*")
-        .order("created_at", { ascending: false });
+    const { data, error } = await banco
+      .from(TABELA_NOTAS)
+      .select("*")
+      .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      notas = (data || []).map((nota) => ({
-        ...nota,
-        caixa: normalizarCaixas(nota.caixa)
-      }));
-      renderNotas();
-      return;
-    } catch (error) {
-      tratarErroBanco(error);
-    }
+    if (error) throw error;
+    notas = (data || []).map((nota) => ({
+      ...nota,
+      caixa: normalizarCaixas(nota.caixa)
+    }));
+    renderNotas();
+    return;
   }
 
   notas = lerListaStorage(STORAGE_KEY).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -1215,8 +1265,45 @@ buscaNotas.addEventListener("input", renderNotas);
 filtroStatus.addEventListener("change", renderNotas);
 buscaExpedicao.addEventListener("input", renderExpedicaoGrid);
 filtroExpedicao.addEventListener("change", renderExpedicaoGrid);
-btnSair.addEventListener("click", () => {
-  mostrarToast("Ação de saída reservada para a futura autenticação.", "aviso");
+btnSair.addEventListener("click", async () => {
+  try {
+    const { error } = await banco.auth.signOut();
+    if (error) throw error;
+  } catch (error) {
+    console.error("Erro ao encerrar a sessão:", error);
+    mostrarToast("Não foi possível encerrar a sessão.", "erro");
+  }
+});
+loginForm.addEventListener("submit", async (evento) => {
+  evento.preventDefault();
+  if (!bancoSupabaseAtivo) return;
+
+  btnEntrar.disabled = true;
+  btnEntrar.textContent = "Entrando...";
+  loginError.textContent = "";
+
+  try {
+    const { data, error } = await banco.auth.signInWithPassword({
+      email: loginEmail.value.trim(),
+      password: loginPassword.value
+    });
+
+    if (error) {
+      loginError.textContent = error.message.toLowerCase().includes("invalid login")
+        ? "E-mail ou senha inválidos."
+        : "Não foi possível entrar. Verifique sua conexão e tente novamente.";
+      return;
+    }
+
+    loginPassword.value = "";
+    await entrarNaAplicacao(data.session);
+  } catch (error) {
+    console.error("Erro durante a autenticação:", error);
+    loginError.textContent = "Não foi possível conectar ao serviço de autenticação.";
+  } finally {
+    btnEntrar.disabled = false;
+    btnEntrar.textContent = "Entrar";
+  }
 });
 
 cliente.addEventListener("input", () => {
@@ -1294,7 +1381,40 @@ async function iniciarSistema() {
   carregarGooglePlaces();
 }
 
-iniciarSistema();
+async function iniciarAutenticacao() {
+  if (!bancoSupabaseAtivo) {
+    loginError.textContent = "Configure a conexão do Supabase para habilitar o acesso.";
+    loginHelp.textContent = "O acesso está bloqueado até que a autenticação e as políticas de filial estejam configuradas.";
+    btnEntrar.disabled = true;
+    return;
+  }
+
+  banco.auth.onAuthStateChange((evento) => {
+    if (evento === "SIGNED_OUT") {
+      notas = [];
+      clientes = [];
+      transportadoras = [];
+      motoristas = [];
+      expedicoesConfirmadas.clear();
+      mostrarTelaLogin();
+    }
+  });
+
+  try {
+    const { data, error } = await banco.auth.getSession();
+    if (error) throw error;
+    if (data.session) {
+      await entrarNaAplicacao(data.session);
+    } else {
+      mostrarTelaLogin();
+    }
+  } catch (error) {
+    console.error("Erro ao restaurar a sessão:", error);
+    mostrarTelaLogin("Não foi possível verificar sua sessão. Atualize a página e tente novamente.");
+  }
+}
+
+iniciarAutenticacao();
 
 // Funcionalidade de Ampliação da Imagem de Perfil
 const iniciarZoomAvatar = () => {
