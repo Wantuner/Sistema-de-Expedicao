@@ -707,6 +707,14 @@ body.formulario-retraido .content-grid {
   gap: 10px;
 }
 
+#btnAtivarSom {
+  border: none;
+  padding: 8px;
+  background: transparent;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
 .panel-chip-hidden {
   display: none;
 }

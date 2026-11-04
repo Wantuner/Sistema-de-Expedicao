@@ -41,6 +41,7 @@ const buscaNotas = document.getElementById("buscaNotas");
 const filtroStatus = document.getElementById("filtroStatus");
 const listaNotas = document.getElementById("listaNotas");
 const contadorFiltrado = document.getElementById("contadorFiltrado");
+const btnAtivarSom = document.getElementById("btnAtivarSom");
 const tabelaNotasWrap = document.querySelector(".panel-table .table-wrap");
 const listaClientes = document.getElementById("listaClientes");
 const listaTransportadoras = document.getElementById("listaTransportadoras");
@@ -98,6 +99,7 @@ let canalExpedicaoRealtime = null;
 let contextoAudioExpedido = null;
 let bufferAudioExpedido = null;
 let preparacaoSomExpedidoPromise = null;
+let somExpedidoAtivo = false;
 const atualizacoesExpedicaoLocais = new Map();
 
 function gerarId() {
@@ -807,7 +809,11 @@ async function carregarNotas() {
 }
 
 function prepararSomExpedido() {
-  if (bufferAudioExpedido) return contextoAudioExpedido.resume();
+  if (bufferAudioExpedido) {
+    return contextoAudioExpedido.state === "running"
+      ? Promise.resolve()
+      : contextoAudioExpedido.resume();
+  }
   if (preparacaoSomExpedidoPromise) return preparacaoSomExpedidoPromise;
 
   const AudioContextExpedicao = window.AudioContext || window.webkitAudioContext;
@@ -816,6 +822,7 @@ function prepararSomExpedido() {
   }
 
   contextoAudioExpedido = new AudioContextExpedicao();
+  contextoAudioExpedido.addEventListener("statechange", atualizarBotaoSomExpedido);
   preparacaoSomExpedidoPromise = (async () => {
     await contextoAudioExpedido.resume();
     const resposta = await fetch("./assets/expedido.wav");
@@ -824,6 +831,7 @@ function prepararSomExpedido() {
     }
 
     bufferAudioExpedido = await contextoAudioExpedido.decodeAudioData(await resposta.arrayBuffer());
+    atualizarBotaoSomExpedido();
   })().catch((error) => {
     preparacaoSomExpedidoPromise = null;
     throw error;
@@ -832,18 +840,58 @@ function prepararSomExpedido() {
   return preparacaoSomExpedidoPromise;
 }
 
-async function tocarSomExpedido() {
-  try {
-    await prepararSomExpedido();
-    const fonte = contextoAudioExpedido.createBufferSource();
-    fonte.buffer = bufferAudioExpedido;
-    fonte.connect(contextoAudioExpedido.destination);
-    fonte.start();
-  } catch (error) {
-    console.error("Não foi possível reproduzir o som de expedição:", error);
-    mostrarToast("Não foi possível reproduzir o som de expedição neste navegador.", "aviso");
+function atualizarBotaoSomExpedido() {
+  if (contextoAudioExpedido?.state !== "running") {
+    somExpedidoAtivo = false;
   }
+
+  btnAtivarSom.textContent = somExpedidoAtivo ? "🔔" : "🔕";
+  btnAtivarSom.setAttribute("aria-label", somExpedidoAtivo ? "Desativar som" : "Ativar som");
+  btnAtivarSom.setAttribute("aria-pressed", String(somExpedidoAtivo));
 }
+
+function tocarSomExpedido() {
+  reproduzirSomExpedido();
+}
+
+function reproduzirSomExpedido() {
+  if (!somExpedidoAtivo || !bufferAudioExpedido || contextoAudioExpedido?.state !== "running") return;
+
+  const fonte = contextoAudioExpedido.createBufferSource();
+  fonte.buffer = bufferAudioExpedido;
+  fonte.connect(contextoAudioExpedido.destination);
+  fonte.start();
+}
+
+btnAtivarSom.addEventListener("click", async () => {
+  btnAtivarSom.disabled = true;
+  try {
+    if (somExpedidoAtivo) {
+      somExpedidoAtivo = false;
+      await contextoAudioExpedido.suspend();
+      atualizarBotaoSomExpedido();
+      mostrarToast("Avisos sonoros desativados.", "aviso");
+      return;
+    }
+
+    await prepararSomExpedido();
+    if (contextoAudioExpedido.state !== "running") {
+      throw new Error("O navegador manteve o áudio suspenso.");
+    }
+
+    somExpedidoAtivo = true;
+    atualizarBotaoSomExpedido();
+    tocarSomExpedido();
+    mostrarToast("Avisos sonoros ativados.", "sucesso");
+  } catch (error) {
+    console.error("Não foi possível ativar o som de expedição:", error);
+    somExpedidoAtivo = false;
+    atualizarBotaoSomExpedido();
+    mostrarToast("Não foi possível ativar o som. Tente novamente neste botão.", "erro");
+  } finally {
+    btnAtivarSom.disabled = false;
+  }
+});
 
 function iniciarCanalExpedicaoRealtime() {
   if (canalExpedicaoRealtime) {
@@ -1509,25 +1557,6 @@ document.addEventListener("keydown", (evento) => {
   if (evento.key === "Escape") {
     fecharCombos();
     fecharMenuQuantidade();
-  }
-});
-
-document.addEventListener("pointerdown", () => {
-  try {
-    void prepararSomExpedido().catch((error) => {
-      console.warn("Não foi possível preparar o áudio após interação:", error);
-    });
-  } catch (error) {
-    console.warn("Não foi possível iniciar o áudio após interação:", error);
-  }
-});
-document.addEventListener("keydown", () => {
-  try {
-    void prepararSomExpedido().catch((error) => {
-      console.warn("Não foi possível preparar o áudio após interação:", error);
-    });
-  } catch (error) {
-    console.warn("Não foi possível iniciar o áudio após interação:", error);
   }
 });
 
