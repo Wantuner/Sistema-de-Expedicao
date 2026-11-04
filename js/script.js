@@ -1200,12 +1200,6 @@ window.excluir = async (id) => {
 
 window.alternarExpedido = async (id, estadoAtual) => {
   if (bancoSupabaseAtivo) {
-    if (!estadoAtual) {
-      void prepararSomExpedido().catch((error) => {
-        console.error("Não foi possível preparar o som de expedição:", error);
-      });
-    }
-
     const notaId = String(id);
     if (!estadoAtual) {
       atualizacoesExpedicaoLocais.set(notaId, Date.now() + 30000);
@@ -1519,14 +1513,22 @@ document.addEventListener("keydown", (evento) => {
 });
 
 document.addEventListener("pointerdown", () => {
-  void prepararSomExpedido().catch((error) => {
-    console.warn("Não foi possível preparar o áudio após interação:", error);
-  });
+  try {
+    void prepararSomExpedido().catch((error) => {
+      console.warn("Não foi possível preparar o áudio após interação:", error);
+    });
+  } catch (error) {
+    console.warn("Não foi possível iniciar o áudio após interação:", error);
+  }
 });
 document.addEventListener("keydown", () => {
-  void prepararSomExpedido().catch((error) => {
-    console.warn("Não foi possível preparar o áudio após interação:", error);
-  });
+  try {
+    void prepararSomExpedido().catch((error) => {
+      console.warn("Não foi possível preparar o áudio após interação:", error);
+    });
+  } catch (error) {
+    console.warn("Não foi possível iniciar o áudio após interação:", error);
+  }
 });
 
 async function iniciarSistema() {
