@@ -1200,7 +1200,11 @@ window.excluir = async (id) => {
 
 window.alternarExpedido = async (id, estadoAtual) => {
   if (bancoSupabaseAtivo) {
-    if (!estadoAtual) await prepararSomExpedido();
+    if (!estadoAtual) {
+      void prepararSomExpedido().catch((error) => {
+        console.error("Não foi possível preparar o som de expedição:", error);
+      });
+    }
 
     const notaId = String(id);
     if (!estadoAtual) {
