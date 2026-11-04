@@ -72,6 +72,30 @@ alter table public.notas
   add column if not exists endereco text,
   add column if not exists filial_id uuid references public.filiais (id) on delete restrict;
 
+alter table public.notas replica identity full;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication
+    where pubname = 'supabase_realtime'
+  ) then
+    raise exception 'A publicação supabase_realtime não existe.';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'notas'
+  ) then
+    alter publication supabase_realtime add table public.notas;
+  end if;
+end
+$$;
+
 alter table public.clientes
   alter column filial_id set default public.minha_filial_id();
 

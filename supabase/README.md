@@ -65,4 +65,7 @@ Para bases com várias filiais, faça as atualizações com filtros que identifi
 - Cada usuário possui uma única `filial_id` em `public.perfis`.
 - Notas, clientes, transportadoras e motoristas recebem essa filial automaticamente.
 - As políticas RLS validam a filial no banco em todas as leituras e gravações. Esconder dados apenas na interface não é usado como controle de acesso.
+- Alterações de notas expedidas são recebidas em tempo real pela publicação `supabase_realtime`, com filtro da filial do usuário. O som `assets/expedido.wav` é reproduzido quando uma nota muda de pendente para expedida.
 - Sem filial associada, o usuário não consegue consultar nem modificar os dados operacionais.
+
+Se o sistema já estiver configurado, execute novamente `supabase/schema.sql` para habilitar os eventos em tempo real da tabela de notas.

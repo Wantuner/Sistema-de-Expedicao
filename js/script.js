@@ -94,6 +94,11 @@ let editId = null;
 let chipCaixaAtivo = null;
 let comboAberto = null;
 let expedicoesConfirmadas = new Set();
+let canalExpedicaoRealtime = null;
+let contextoAudioExpedido = null;
+let bufferAudioExpedido = null;
+let preparacaoSomExpedidoPromise = null;
+const atualizacoesExpedicaoLocais = new Map();
 
 function gerarId() {
   return Date.now() + Math.floor(Math.random() * 1000);
@@ -801,6 +806,82 @@ async function carregarNotas() {
   renderNotas();
 }
 
+function prepararSomExpedido() {
+  if (bufferAudioExpedido) return contextoAudioExpedido.resume();
+  if (preparacaoSomExpedidoPromise) return preparacaoSomExpedidoPromise;
+
+  const AudioContextExpedicao = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextExpedicao) {
+    return Promise.reject(new Error("Este navegador não oferece suporte à reprodução de áudio."));
+  }
+
+  contextoAudioExpedido = new AudioContextExpedicao();
+  preparacaoSomExpedidoPromise = (async () => {
+    await contextoAudioExpedido.resume();
+    const resposta = await fetch("./assets/expedido.wav");
+    if (!resposta.ok) {
+      throw new Error(`Não foi possível carregar o som de expedição (${resposta.status}).`);
+    }
+
+    bufferAudioExpedido = await contextoAudioExpedido.decodeAudioData(await resposta.arrayBuffer());
+  })().catch((error) => {
+    preparacaoSomExpedidoPromise = null;
+    throw error;
+  });
+
+  return preparacaoSomExpedidoPromise;
+}
+
+async function tocarSomExpedido() {
+  try {
+    await prepararSomExpedido();
+    const fonte = contextoAudioExpedido.createBufferSource();
+    fonte.buffer = bufferAudioExpedido;
+    fonte.connect(contextoAudioExpedido.destination);
+    fonte.start();
+  } catch (error) {
+    console.error("Não foi possível reproduzir o som de expedição:", error);
+    mostrarToast("Não foi possível reproduzir o som de expedição neste navegador.", "aviso");
+  }
+}
+
+function iniciarCanalExpedicaoRealtime() {
+  if (canalExpedicaoRealtime) {
+    void banco.removeChannel(canalExpedicaoRealtime);
+  }
+
+  canalExpedicaoRealtime = banco
+    .channel(`filial-${perfilAtual.filial_id}-notas-expedidas`)
+    .on("postgres_changes", {
+      event: "UPDATE",
+      schema: "public",
+      table: TABELA_NOTAS,
+      filter: `filial_id=eq.${perfilAtual.filial_id}`
+    }, (payload) => {
+      if (payload.old.expedido !== false || payload.new.expedido !== true) return;
+
+      const notaId = String(payload.new.id);
+      const expiracaoLocal = atualizacoesExpedicaoLocais.get(notaId);
+      if (expiracaoLocal && expiracaoLocal > Date.now()) {
+        atualizacoesExpedicaoLocais.delete(notaId);
+        return;
+      }
+      atualizacoesExpedicaoLocais.delete(notaId);
+
+      tocarSomExpedido();
+      carregarNotas().catch((error) => {
+        console.error("Erro ao atualizar notas após expedição em tempo real:", error);
+        tratarErroBanco(error);
+      });
+    })
+    .subscribe((status, error) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        console.error("Erro no canal de expedição em tempo real:", error);
+        mostrarToast("Não foi possível conectar aos avisos de expedição em tempo real.", "erro");
+      }
+    });
+}
+
 function obterDadosFormulario() {
   return {
     cliente: cliente.value.trim(),
@@ -1119,6 +1200,18 @@ window.excluir = async (id) => {
 
 window.alternarExpedido = async (id, estadoAtual) => {
   if (bancoSupabaseAtivo) {
+    if (!estadoAtual) await prepararSomExpedido();
+
+    const notaId = String(id);
+    if (!estadoAtual) {
+      atualizacoesExpedicaoLocais.set(notaId, Date.now() + 30000);
+      setTimeout(() => {
+        if (atualizacoesExpedicaoLocais.get(notaId) <= Date.now()) {
+          atualizacoesExpedicaoLocais.delete(notaId);
+        }
+      }, 30000);
+    }
+
     try {
       const { error } = await banco
         .from(TABELA_NOTAS)
@@ -1129,10 +1222,13 @@ window.alternarExpedido = async (id, estadoAtual) => {
       if (estadoAtual) {
         expedicoesConfirmadas.delete(String(id));
         salvarExpedicoesConfirmadas();
+      } else {
+        tocarSomExpedido();
       }
       mostrarToast(!estadoAtual ? "Registro marcado como expedido." : "Registro reaberto.", "sucesso");
       await carregarNotas();
     } catch (error) {
+      atualizacoesExpedicaoLocais.delete(notaId);
       tratarErroBanco(error);
     }
     return;
@@ -1418,6 +1514,17 @@ document.addEventListener("keydown", (evento) => {
   }
 });
 
+document.addEventListener("pointerdown", () => {
+  void prepararSomExpedido().catch((error) => {
+    console.warn("Não foi possível preparar o áudio após interação:", error);
+  });
+});
+document.addEventListener("keydown", () => {
+  void prepararSomExpedido().catch((error) => {
+    console.warn("Não foi possível preparar o áudio após interação:", error);
+  });
+});
+
 async function iniciarSistema() {
   carregarEstadoSidebar();
   carregarEstadoFormulario();
@@ -1426,6 +1533,7 @@ async function iniciarSistema() {
   carregarView();
   await carregarCadastros();
   await carregarNotas();
+  iniciarCanalExpedicaoRealtime();
   carregarGooglePlaces();
 }
 
@@ -1439,6 +1547,11 @@ async function iniciarAutenticacao() {
 
   banco.auth.onAuthStateChange((evento) => {
     if (evento === "SIGNED_OUT") {
+      if (canalExpedicaoRealtime) {
+        void banco.removeChannel(canalExpedicaoRealtime);
+        canalExpedicaoRealtime = null;
+      }
+      atualizacoesExpedicaoLocais.clear();
       notas = [];
       clientes = [];
       transportadoras = [];
