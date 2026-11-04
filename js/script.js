@@ -41,6 +41,7 @@ const buscaNotas = document.getElementById("buscaNotas");
 const filtroStatus = document.getElementById("filtroStatus");
 const listaNotas = document.getElementById("listaNotas");
 const contadorFiltrado = document.getElementById("contadorFiltrado");
+const tabelaNotasWrap = document.querySelector(".panel-table .table-wrap");
 const listaClientes = document.getElementById("listaClientes");
 const listaTransportadoras = document.getElementById("listaTransportadoras");
 const listaMotoristas = document.getElementById("listaMotoristas");
@@ -1265,6 +1266,53 @@ buscaNotas.addEventListener("input", renderNotas);
 filtroStatus.addEventListener("change", renderNotas);
 buscaExpedicao.addEventListener("input", renderExpedicaoGrid);
 filtroExpedicao.addEventListener("change", renderExpedicaoGrid);
+
+let arrasteTabela = null;
+let suprimirCliqueTabela = false;
+
+tabelaNotasWrap.addEventListener("mousedown", (evento) => {
+  if (evento.button !== 0 || evento.target.closest("button, a, input, select, textarea, [contenteditable='true']")) return;
+
+  arrasteTabela = {
+    inicioX: evento.clientX,
+    scrollInicial: tabelaNotasWrap.scrollLeft,
+    iniciou: false
+  };
+});
+
+document.addEventListener("mousemove", (evento) => {
+  if (!arrasteTabela) return;
+
+  const deslocamento = evento.clientX - arrasteTabela.inicioX;
+  if (!arrasteTabela.iniciou && Math.abs(deslocamento) < 5) return;
+
+  arrasteTabela.iniciou = true;
+  tabelaNotasWrap.classList.add("is-dragging");
+  tabelaNotasWrap.scrollLeft = arrasteTabela.scrollInicial - deslocamento;
+  evento.preventDefault();
+});
+
+document.addEventListener("mouseup", () => {
+  if (!arrasteTabela) return;
+
+  if (arrasteTabela.iniciou) {
+    suprimirCliqueTabela = true;
+    setTimeout(() => {
+      suprimirCliqueTabela = false;
+    }, 0);
+  }
+
+  arrasteTabela = null;
+  tabelaNotasWrap.classList.remove("is-dragging");
+});
+
+tabelaNotasWrap.addEventListener("click", (evento) => {
+  if (!suprimirCliqueTabela) return;
+
+  evento.preventDefault();
+  evento.stopPropagation();
+}, true);
+
 btnSair.addEventListener("click", async () => {
   try {
     const { error } = await banco.auth.signOut();

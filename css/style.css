@@ -1093,6 +1093,15 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
   background: var(--surface-strong);
 }
 
+.panel-table .table-wrap {
+  cursor: grab;
+}
+
+.panel-table .table-wrap.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
 .notas-table {
   width: 100%;
   border-collapse: collapse;
@@ -1119,6 +1128,29 @@ body.formulario-retraido .panel-form .panel-toggle-icon {
 
 .notas-table thead th:last-child {
   text-align: center;
+}
+
+@media (min-width: 761px) {
+  .notas-table thead th:first-child {
+    left: 0;
+    z-index: 2;
+    background: #f8f5ee;
+  }
+
+  .notas-table tbody td:first-child:not(.empty-state) {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #fff;
+  }
+
+  .notas-table tbody tr:hover > td:first-child:not(.empty-state) {
+    background: #e8f7f6;
+  }
+
+  .notas-table tbody tr.is-expedido > td:first-child:not(.empty-state) {
+    background: #dff3f2;
+  }
 }
 
 .notas-table tbody tr:hover {
