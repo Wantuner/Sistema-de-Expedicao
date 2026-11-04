@@ -898,6 +898,42 @@ function iniciarCanalExpedicaoRealtime() {
     void banco.removeChannel(canalExpedicaoRealtime);
   }
 
+  const processarAlteracaoNota = (payload) => {
+    const notaRecebida = payload.new;
+    const notaId = String(notaRecebida.id);
+    const indiceNota = notas.findIndex((nota) => String(nota.id) === notaId);
+    const notaAnterior = indiceNota >= 0 ? notas[indiceNota] : payload.old;
+    const estadoAnterior = notaAnterior?.expedido;
+    const expiracaoLocal = atualizacoesExpedicaoLocais.get(notaId);
+    const alteracaoLocal = expiracaoLocal && expiracaoLocal > Date.now();
+
+    if (expiracaoLocal) atualizacoesExpedicaoLocais.delete(notaId);
+
+    const notaAtualizada = {
+      ...(indiceNota >= 0 ? notas[indiceNota] : {}),
+      ...notaRecebida,
+      caixa: normalizarCaixas(notaRecebida.caixa)
+    };
+
+    if (indiceNota >= 0) {
+      notas.splice(indiceNota, 1, notaAtualizada);
+    } else {
+      notas.push(notaAtualizada);
+    }
+
+    notas.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    renderNotas();
+
+    if (
+      payload.eventType === "UPDATE" &&
+      estadoAnterior === false &&
+      notaRecebida.expedido === true &&
+      !alteracaoLocal
+    ) {
+      tocarSomExpedido();
+    }
+  };
+
   canalExpedicaoRealtime = banco
     .channel(`filial-${perfilAtual.filial_id}-notas-expedidas`)
     .on("postgres_changes", {
@@ -905,27 +941,22 @@ function iniciarCanalExpedicaoRealtime() {
       schema: "public",
       table: TABELA_NOTAS,
       filter: `filial_id=eq.${perfilAtual.filial_id}`
-    }, (payload) => {
-      if (payload.old.expedido !== false || payload.new.expedido !== true) return;
-
-      const notaId = String(payload.new.id);
-      const expiracaoLocal = atualizacoesExpedicaoLocais.get(notaId);
-      if (expiracaoLocal && expiracaoLocal > Date.now()) {
-        atualizacoesExpedicaoLocais.delete(notaId);
-        return;
-      }
-      atualizacoesExpedicaoLocais.delete(notaId);
-
-      tocarSomExpedido();
-      carregarNotas().catch((error) => {
-        console.error("Erro ao atualizar notas após expedição em tempo real:", error);
-        tratarErroBanco(error);
-      });
-    })
+    }, processarAlteracaoNota)
+    .on("postgres_changes", {
+      event: "INSERT",
+      schema: "public",
+      table: TABELA_NOTAS,
+      filter: `filial_id=eq.${perfilAtual.filial_id}`
+    }, processarAlteracaoNota)
     .subscribe((status, error) => {
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+      if (status === "SUBSCRIBED") {
+        console.info(`Atualizações em tempo real conectadas para a filial ${perfilAtual.filial_id}.`);
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         console.error("Erro no canal de expedição em tempo real:", error);
-        mostrarToast("Não foi possível conectar aos avisos de expedição em tempo real.", "erro");
+        mostrarToast(
+          "Não foi possível conectar às atualizações em tempo real. Verifique a configuração Realtime da tabela notas no Supabase.",
+          "erro"
+        );
       }
     });
 }
