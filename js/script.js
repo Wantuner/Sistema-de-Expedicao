@@ -75,7 +75,6 @@ const VIEW_STATE_KEY = "expedicao.viewAtual";
 const CLIENTES_VISIBLE_KEY = "expedicao.clientesVisible";
 const TRANSPORTADORAS_VISIBLE_KEY = "expedicao.transportadorasVisible";
 const MOTORISTAS_VISIBLE_KEY = "expedicao.motoristasVisible";
-const EXPEDICAO_CONFIRMADA_STORAGE_KEY = "expedicao.confirmadas";
 const TABELA_NOTAS = "notas";
 const MODELO_ROMANEIO_PATH = "assets/Modelo.docx";
 
@@ -94,13 +93,15 @@ let motoristas = [];
 let editId = null;
 let chipCaixaAtivo = null;
 let comboAberto = null;
-let expedicoesConfirmadas = new Set();
 let canalExpedicaoRealtime = null;
 let contextoAudioExpedido = null;
 let bufferAudioExpedido = null;
 let preparacaoSomExpedidoPromise = null;
 let somExpedidoAtivo = false;
 const atualizacoesExpedicaoLocais = new Map();
+let sincronizacaoRealtimeEmAndamento = false;
+let sincronizacaoRealtimeSolicitada = false;
+const eventosRealtimePendentes = [];
 
 function gerarId() {
   return Date.now() + Math.floor(Math.random() * 1000);
@@ -121,16 +122,6 @@ function lerListaStorage(chave) {
 
 function salvarListaStorage(chave, lista) {
   localStorage.setItem(chave, JSON.stringify(lista));
-}
-
-function carregarExpedicoesConfirmadas() {
-  const chave = `${EXPEDICAO_CONFIRMADA_STORAGE_KEY}.${perfilAtual?.filial_id || "sem-filial"}`;
-  expedicoesConfirmadas = new Set(lerListaStorage(chave).map(String));
-}
-
-function salvarExpedicoesConfirmadas() {
-  const chave = `${EXPEDICAO_CONFIRMADA_STORAGE_KEY}.${perfilAtual?.filial_id || "sem-filial"}`;
-  salvarListaStorage(chave, Array.from(expedicoesConfirmadas));
 }
 
 function mostrarTelaLogin(mensagem = "") {
@@ -161,7 +152,7 @@ async function carregarPerfilUsuario(usuario) {
 async function entrarNaAplicacao(session) {
   try {
     await carregarPerfilUsuario(session.user);
-    await iniciarSistema();
+    await iniciarSistema(session);
     loginScreen.hidden = true;
     appShell.hidden = false;
     loginError.textContent = "";
@@ -798,13 +789,16 @@ async function carregarNotas() {
     if (error) throw error;
     notas = (data || []).map((nota) => ({
       ...nota,
-      caixa: normalizarCaixas(nota.caixa)
+      caixa: normalizarCaixas(nota.caixa),
+      expedicao_confirmada: Boolean(nota.expedicao_confirmada)
     }));
     renderNotas();
     return;
   }
 
-  notas = lerListaStorage(STORAGE_KEY).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  notas = lerListaStorage(STORAGE_KEY)
+    .map((nota) => ({ ...nota, expedicao_confirmada: Boolean(nota.expedicao_confirmada) }))
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   renderNotas();
 }
 
@@ -893,21 +887,46 @@ btnAtivarSom.addEventListener("click", async () => {
   }
 });
 
-function iniciarCanalExpedicaoRealtime() {
-  if (canalExpedicaoRealtime) {
-    void banco.removeChannel(canalExpedicaoRealtime);
+function obterPayloadRealtime(payload) {
+  if (payload?.payload && typeof payload.payload === "object") {
+    return payload.payload;
   }
+  return payload;
+}
 
-  const processarAlteracaoNota = (payload) => {
-    const notaRecebida = payload.new;
+async function aplicarAlteracaoRealtime(alteracao) {
+  const { table, operation } = alteracao;
+
+  if (table === TABELA_NOTAS) {
+    const notaRecebida = operation === "DELETE" ? alteracao.old_record : alteracao.record;
+    if (!notaRecebida?.id) {
+      console.error("Evento Realtime de nota sem registro identificável:", alteracao);
+      return;
+    }
+
     const notaId = String(notaRecebida.id);
     const indiceNota = notas.findIndex((nota) => String(nota.id) === notaId);
-    const notaAnterior = indiceNota >= 0 ? notas[indiceNota] : payload.old;
-    const estadoAnterior = notaAnterior?.expedido;
+    const notaAnterior = indiceNota >= 0 ? notas[indiceNota] : alteracao.old_record;
     const expiracaoLocal = atualizacoesExpedicaoLocais.get(notaId);
-    const alteracaoLocal = expiracaoLocal && expiracaoLocal > Date.now();
+    const transicaoParaExpedido =
+      operation === "UPDATE" &&
+      notaAnterior?.expedido === false &&
+      notaRecebida.expedido === true;
+    const alteracaoLocal = transicaoParaExpedido && expiracaoLocal > Date.now();
 
-    if (expiracaoLocal) atualizacoesExpedicaoLocais.delete(notaId);
+    if (
+      operation === "DELETE" ||
+      (expiracaoLocal && expiracaoLocal <= Date.now()) ||
+      transicaoParaExpedido
+    ) {
+      atualizacoesExpedicaoLocais.delete(notaId);
+    }
+
+    if (operation === "DELETE") {
+      if (indiceNota >= 0) notas.splice(indiceNota, 1);
+      renderNotas();
+      return;
+    }
 
     const notaAtualizada = {
       ...(indiceNota >= 0 ? notas[indiceNota] : {}),
@@ -924,37 +943,69 @@ function iniciarCanalExpedicaoRealtime() {
     notas.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     renderNotas();
 
-    if (
-      payload.eventType === "UPDATE" &&
-      estadoAnterior === false &&
-      notaRecebida.expedido === true &&
-      !alteracaoLocal
-    ) {
+    if (transicaoParaExpedido && !alteracaoLocal) {
       tocarSomExpedido();
     }
-  };
+    return;
+  }
+
+  if (["clientes", "transportadoras", "motoristas"].includes(table)) {
+    await carregarCadastros();
+    return;
+  }
+
+  console.warn("Evento Realtime recebido para tabela não reconhecida:", table);
+}
+
+async function sincronizarDadosRealtime() {
+  sincronizacaoRealtimeSolicitada = true;
+  if (sincronizacaoRealtimeEmAndamento) return;
+
+  sincronizacaoRealtimeEmAndamento = true;
+  try {
+    while (sincronizacaoRealtimeSolicitada) {
+      sincronizacaoRealtimeSolicitada = false;
+      await Promise.all([carregarCadastros(), carregarNotas()]);
+
+      while (eventosRealtimePendentes.length) {
+        const eventos = eventosRealtimePendentes.splice(0);
+        for (const evento of eventos) {
+          await aplicarAlteracaoRealtime(evento);
+        }
+      }
+    }
+  } catch (error) {
+    eventosRealtimePendentes.length = 0;
+    tratarErroBanco(error);
+  } finally {
+    sincronizacaoRealtimeEmAndamento = false;
+  }
+}
+
+function iniciarCanalExpedicaoRealtime() {
+  if (canalExpedicaoRealtime) {
+    void banco.removeChannel(canalExpedicaoRealtime);
+  }
 
   canalExpedicaoRealtime = banco
-    .channel(`filial-${perfilAtual.filial_id}-notas-expedidas`)
-    .on("postgres_changes", {
-      event: "UPDATE",
-      schema: "public",
-      table: TABELA_NOTAS,
-      filter: `filial_id=eq.${perfilAtual.filial_id}`
-    }, processarAlteracaoNota)
-    .on("postgres_changes", {
-      event: "INSERT",
-      schema: "public",
-      table: TABELA_NOTAS,
-      filter: `filial_id=eq.${perfilAtual.filial_id}`
-    }, processarAlteracaoNota)
+    .channel(`filial:${perfilAtual.filial_id}`, { config: { private: true } })
+    .on("broadcast", { event: "*" }, (payload) => {
+      const alteracao = obterPayloadRealtime(payload);
+      if (sincronizacaoRealtimeEmAndamento) {
+        eventosRealtimePendentes.push(alteracao);
+        sincronizacaoRealtimeSolicitada = true;
+        return;
+      }
+      void aplicarAlteracaoRealtime(alteracao).catch(tratarErroBanco);
+    })
     .subscribe((status, error) => {
       if (status === "SUBSCRIBED") {
         console.info(`Atualizações em tempo real conectadas para a filial ${perfilAtual.filial_id}.`);
+        void sincronizarDadosRealtime();
       } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         console.error("Erro no canal de expedição em tempo real:", error);
         mostrarToast(
-          "Não foi possível conectar às atualizações em tempo real. Verifique a configuração Realtime da tabela notas no Supabase.",
+          "Não foi possível conectar às atualizações em tempo real. Verifique as políticas de Broadcast do Supabase.",
           "erro"
         );
       }
@@ -1024,7 +1075,7 @@ function renderExpedicaoGrid() {
   const termo = buscaExpedicao ? buscaExpedicao.value.trim().toLowerCase() : "";
   const filtro = filtroExpedicao ? filtroExpedicao.value : "todos";
   const notasFiltradas = notasExpedidas.filter((nota) => {
-    const expedicaoConfirmada = expedicoesConfirmadas.has(String(nota.id));
+    const expedicaoConfirmada = nota.expedicao_confirmada;
     const atendeBusca = !termo || [nota.cliente, nota.transportadora, nota.endereco, nota.nf, nota.pedido].some((campo) => {
       return String(campo).toLowerCase().includes(termo);
     });
@@ -1050,7 +1101,7 @@ function renderExpedicaoGrid() {
   }
 
   gridExpedicao.innerHTML = notasFiltradas.map((nota) => {
-    const expedicaoConfirmada = expedicoesConfirmadas.has(String(nota.id));
+    const expedicaoConfirmada = nota.expedicao_confirmada;
     const statusTexto = expedicaoConfirmada ? "Expedido" : "A expedir";
     const clienteCompleto = escaparHtml(nota.cliente || "-");
     const clienteCurto = escaparHtml(formatarNomeCurto(nota.cliente));
@@ -1204,7 +1255,8 @@ async function salvarRegistro() {
           .from(TABELA_NOTAS)
           .insert({
             ...dadosBanco,
-            expedido: false
+            expedido: false,
+            expedicao_confirmada: false
           });
 
         if (error) throw error;
@@ -1227,6 +1279,7 @@ async function salvarRegistro() {
       id: gerarId(),
       ...dados,
       expedido: false,
+      expedicao_confirmada: false,
       created_at: new Date().toISOString()
     });
     mostrarToast("Registro criado com sucesso.", "sucesso");
@@ -1292,14 +1345,14 @@ window.alternarExpedido = async (id, estadoAtual) => {
     try {
       const { error } = await banco
         .from(TABELA_NOTAS)
-        .update({ expedido: !estadoAtual })
+        .update({
+          expedido: !estadoAtual,
+          ...(estadoAtual ? { expedicao_confirmada: false } : {})
+        })
         .eq("id", id);
 
       if (error) throw error;
-      if (estadoAtual) {
-        expedicoesConfirmadas.delete(String(id));
-        salvarExpedicoesConfirmadas();
-      } else {
+      if (!estadoAtual) {
         tocarSomExpedido();
       }
       mostrarToast(!estadoAtual ? "Registro marcado como expedido." : "Registro reaberto.", "sucesso");
@@ -1311,27 +1364,48 @@ window.alternarExpedido = async (id, estadoAtual) => {
     return;
   }
 
-  if (estadoAtual) {
-    expedicoesConfirmadas.delete(String(id));
-    salvarExpedicoesConfirmadas();
-  }
-  notas = notas.map((nota) => (nota.id === id ? { ...nota, expedido: !estadoAtual } : nota));
+  notas = notas.map((nota) => (nota.id === id ? {
+    ...nota,
+    expedido: !estadoAtual,
+    ...(estadoAtual ? { expedicao_confirmada: false } : {})
+  } : nota));
   salvarNotas();
   mostrarToast(!estadoAtual ? "Registro marcado como expedido." : "Registro reaberto.", "sucesso");
   carregarNotas();
 };
 
-window.confirmarExpedicao = (id) => {
-  const idStr = String(id);
-  if (expedicoesConfirmadas.has(idStr)) {
-    expedicoesConfirmadas.delete(idStr);
-    mostrarToast("Card desmarcado como expedido.", "sucesso");
-  } else {
-    expedicoesConfirmadas.add(idStr);
-    mostrarToast("Card marcado como expedido.", "sucesso");
+window.confirmarExpedicao = async (id) => {
+  const nota = notas.find((item) => String(item.id) === String(id));
+  if (!nota) return;
+
+  const expedicaoConfirmada = !nota.expedicao_confirmada;
+  if (bancoSupabaseAtivo) {
+    try {
+      const { error } = await banco
+        .from(TABELA_NOTAS)
+        .update({ expedicao_confirmada: expedicaoConfirmada })
+        .eq("id", id);
+      if (error) throw error;
+      await carregarNotas();
+      mostrarToast(
+        expedicaoConfirmada ? "Card marcado como expedido." : "Card desmarcado como expedido.",
+        "sucesso"
+      );
+    } catch (error) {
+      tratarErroBanco(error);
+    }
+    return;
   }
-  salvarExpedicoesConfirmadas();
-  renderExpedicaoGrid();
+
+  notas = notas.map((item) => (
+    String(item.id) === String(id) ? { ...item, expedicao_confirmada: expedicaoConfirmada } : item
+  ));
+  salvarNotas();
+  renderNotas();
+  mostrarToast(
+    expedicaoConfirmada ? "Card marcado como expedido." : "Card desmarcado como expedido.",
+    "sucesso"
+  );
 };
 
 function gerarPDF() {
@@ -1591,12 +1665,12 @@ document.addEventListener("keydown", (evento) => {
   }
 });
 
-async function iniciarSistema() {
+async function iniciarSistema(session) {
   carregarEstadoSidebar();
   carregarEstadoFormulario();
   carregarEstadoListas();
-  carregarExpedicoesConfirmadas();
   carregarView();
+  await banco.realtime.setAuth(session.access_token);
   await carregarCadastros();
   await carregarNotas();
   iniciarCanalExpedicaoRealtime();
@@ -1622,7 +1696,6 @@ async function iniciarAutenticacao() {
       clientes = [];
       transportadoras = [];
       motoristas = [];
-      expedicoesConfirmadas.clear();
       mostrarTelaLogin();
     }
   });

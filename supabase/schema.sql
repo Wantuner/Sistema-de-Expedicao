@@ -54,6 +54,7 @@ create table if not exists public.notas (
   endereco text,
   caixa jsonb not null default '[]'::jsonb,
   expedido boolean not null default false,
+  expedicao_confirmada boolean not null default false,
   filial_id uuid references public.filiais (id) on delete restrict,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -70,6 +71,7 @@ alter table public.motoristas
 
 alter table public.notas
   add column if not exists endereco text,
+  add column if not exists expedicao_confirmada boolean not null default false,
   add column if not exists filial_id uuid references public.filiais (id) on delete restrict;
 
 alter table public.notas replica identity full;
@@ -218,3 +220,87 @@ create policy "Acesso da filial a notas"
   to authenticated
   using (filial_id = (select public.minha_filial_id()))
   with check (filial_id = (select public.minha_filial_id()));
+
+drop policy if exists "Usuarios recebem atualizacoes da propria filial" on realtime.messages;
+drop policy if exists "Usuarios limitados ao topico da propria filial" on realtime.messages;
+create policy "Usuarios recebem atualizacoes da propria filial"
+  on realtime.messages
+  for select
+  to authenticated
+  using (
+    realtime.messages.extension = 'broadcast'
+    and
+    exists (
+      select 1
+      from public.perfis as perfil
+      where perfil.id = (select auth.uid())
+        and (select realtime.topic()) = 'filial:' || perfil.filial_id::text
+    )
+  );
+
+create policy "Usuarios limitados ao topico da propria filial"
+  on realtime.messages
+  as restrictive
+  for select
+  to authenticated
+  using (
+    realtime.messages.extension = 'broadcast'
+    and exists (
+      select 1
+      from public.perfis as perfil
+      where perfil.id = (select auth.uid())
+        and (select realtime.topic()) = 'filial:' || perfil.filial_id::text
+    )
+  );
+
+create or replace function public.transmitir_alteracao_filial()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  filial_evento uuid;
+begin
+  filial_evento := coalesce(new.filial_id, old.filial_id);
+
+  if filial_evento is not null then
+    perform realtime.send(
+      payload => jsonb_build_object(
+        'table', tg_table_name,
+        'operation', tg_op,
+        'record', case when tg_op = 'DELETE' then null else to_jsonb(new) end,
+        'old_record', case when tg_op = 'INSERT' then null else to_jsonb(old) end
+      ),
+      event => tg_op,
+      topic => 'filial:' || filial_evento::text,
+      private => true
+    );
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists clientes_transmitir_alteracao on public.clientes;
+create trigger clientes_transmitir_alteracao
+  after insert or update or delete on public.clientes
+  for each row execute function public.transmitir_alteracao_filial();
+
+drop trigger if exists transportadoras_transmitir_alteracao on public.transportadoras;
+create trigger transportadoras_transmitir_alteracao
+  after insert or update or delete on public.transportadoras
+  for each row execute function public.transmitir_alteracao_filial();
+
+drop trigger if exists motoristas_transmitir_alteracao on public.motoristas;
+create trigger motoristas_transmitir_alteracao
+  after insert or update or delete on public.motoristas
+  for each row execute function public.transmitir_alteracao_filial();
+
+drop trigger if exists notas_transmitir_alteracao on public.notas;
+create trigger notas_transmitir_alteracao
+  after insert or update or delete on public.notas
+  for each row execute function public.transmitir_alteracao_filial();

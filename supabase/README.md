@@ -65,7 +65,8 @@ Para bases com várias filiais, faça as atualizações com filtros que identifi
 - Cada usuário possui uma única `filial_id` em `public.perfis`. O Realtime compartilha atualizações entre usuários autenticados da mesma filial; as sessões podem estar abertas em computadores diferentes.
 - Notas, clientes, transportadoras e motoristas recebem essa filial automaticamente.
 - As políticas RLS validam a filial no banco em todas as leituras e gravações. Esconder dados apenas na interface não é usado como controle de acesso.
-- Criações e atualizações de notas são recebidas em tempo real pela publicação `supabase_realtime`, com filtro da filial do usuário. O som `assets/expedido.wav` é reproduzido quando uma nota muda de pendente para expedida. Para permitir notificações em segundo plano, cada usuário deve ativar o sino 🔔 em cada computador/navegador.
+- Criações, atualizações e exclusões de notas e cadastros são transmitidas em tempo real por canais privados, autorizados pela filial em `realtime.messages`. O estado do botão de liberação da fila também fica salvo na nota e é compartilhado entre os usuários da filial.
+- O som `assets/expedido.wav` é reproduzido nos outros computadores quando uma nota muda de pendente para expedida. Como os navegadores bloqueiam áudio sem interação do usuário, cada usuário deve ativar o sino 🔔 em cada computador/navegador.
 - Sem filial associada, o usuário não consegue consultar nem modificar os dados operacionais.
 
-Se o sistema já estiver configurado, execute novamente `supabase/schema.sql` no SQL Editor do Supabase para adicionar a tabela de notas à publicação `supabase_realtime` e habilitar os eventos.
+Se o sistema já estiver configurado, execute novamente todo o arquivo `supabase/schema.sql` no SQL Editor do Supabase. Isso instala as políticas e os gatilhos privados necessários para transmitir alterações de notas e cadastros aos usuários da mesma filial e adiciona o estado compartilhado da fila. Depois, saia e entre novamente no sistema para renovar o token usado na autorização do Realtime.
