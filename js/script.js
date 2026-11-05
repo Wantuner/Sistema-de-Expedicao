@@ -21,6 +21,7 @@ const btnSalvarMotorista = document.getElementById("btnSalvarMotorista");
 const btnToggleClientes = document.getElementById("btnToggleClientes");
 const btnToggleTransportadoras = document.getElementById("btnToggleTransportadoras");
 const btnToggleMotoristas = document.getElementById("btnToggleMotoristas");
+const authLoading = document.getElementById("authLoading");
 const loginScreen = document.getElementById("loginScreen");
 const loginForm = document.getElementById("loginForm");
 const loginEmail = document.getElementById("loginEmail");
@@ -98,6 +99,7 @@ let contextoAudioExpedido = null;
 let bufferAudioExpedido = null;
 let preparacaoSomExpedidoPromise = null;
 let somExpedidoAtivo = false;
+let temporizadorCliqueSino = null;
 const atualizacoesExpedicaoLocais = new Map();
 let sincronizacaoRealtimeEmAndamento = false;
 let sincronizacaoRealtimeSolicitada = false;
@@ -126,6 +128,7 @@ function salvarListaStorage(chave, lista) {
 
 function mostrarTelaLogin(mensagem = "") {
   perfilAtual = null;
+  authLoading.hidden = true;
   appShell.hidden = true;
   loginScreen.hidden = false;
   loginError.textContent = mensagem;
@@ -134,7 +137,7 @@ function mostrarTelaLogin(mensagem = "") {
 async function carregarPerfilUsuario(usuario) {
   const { data, error } = await banco
     .from("perfis")
-    .select("filial_id, filiais(nome)")
+    .select("id, filial_id, som_ativado, filiais(nome)")
     .eq("id", usuario.id)
     .maybeSingle();
 
@@ -144,6 +147,8 @@ async function carregarPerfilUsuario(usuario) {
   }
 
   perfilAtual = data;
+  somExpedidoAtivo = Boolean(data.som_ativado);
+  atualizarBotaoSomExpedido();
   usuarioLogado.textContent = usuario.email || "Usuário";
   nomeFilial.textContent = data.filiais.nome;
   filialLogada.textContent = data.filiais.nome;
@@ -153,6 +158,7 @@ async function entrarNaAplicacao(session) {
   try {
     await carregarPerfilUsuario(session.user);
     await iniciarSistema(session);
+    authLoading.hidden = true;
     loginScreen.hidden = true;
     appShell.hidden = false;
     loginError.textContent = "";
@@ -802,12 +808,8 @@ async function carregarNotas() {
   renderNotas();
 }
 
-function prepararSomExpedido() {
-  if (bufferAudioExpedido) {
-    return contextoAudioExpedido.state === "running"
-      ? Promise.resolve()
-      : contextoAudioExpedido.resume();
-  }
+function carregarSomExpedido() {
+  if (bufferAudioExpedido) return Promise.resolve();
   if (preparacaoSomExpedidoPromise) return preparacaoSomExpedidoPromise;
 
   const AudioContextExpedicao = window.AudioContext || window.webkitAudioContext;
@@ -818,7 +820,6 @@ function prepararSomExpedido() {
   contextoAudioExpedido = new AudioContextExpedicao();
   contextoAudioExpedido.addEventListener("statechange", atualizarBotaoSomExpedido);
   preparacaoSomExpedidoPromise = (async () => {
-    await contextoAudioExpedido.resume();
     const resposta = await fetch("./assets/expedido.wav");
     if (!resposta.ok) {
       throw new Error(`Não foi possível carregar o som de expedição (${resposta.status}).`);
@@ -834,57 +835,167 @@ function prepararSomExpedido() {
   return preparacaoSomExpedidoPromise;
 }
 
-function atualizarBotaoSomExpedido() {
-  if (contextoAudioExpedido?.state !== "running") {
-    somExpedidoAtivo = false;
-  }
+function prepararSomExpedido() {
+  return carregarSomExpedido().then(() => (
+    contextoAudioExpedido.state === "running"
+      ? undefined
+      : contextoAudioExpedido.resume()
+  ));
+}
 
+function atualizarBotaoSomExpedido() {
   btnAtivarSom.textContent = somExpedidoAtivo ? "🔔" : "🔕";
-  btnAtivarSom.setAttribute("aria-label", somExpedidoAtivo ? "Desativar som" : "Ativar som");
+  btnAtivarSom.setAttribute(
+    "aria-label",
+    somExpedidoAtivo
+      ? "Clique para enviar um alerta. Clique duas vezes para desativar os avisos sonoros."
+      : "Clique para enviar um alerta. Clique duas vezes para ativar os avisos sonoros."
+  );
+  btnAtivarSom.title = somExpedidoAtivo
+    ? "Clique: enviar alerta. Duplo clique: desativar avisos sonoros."
+    : "Clique: enviar alerta. Duplo clique: ativar avisos sonoros.";
   btnAtivarSom.setAttribute("aria-pressed", String(somExpedidoAtivo));
 }
 
-function tocarSomExpedido() {
-  reproduzirSomExpedido();
+function tocarSomExpedido(forcar = false) {
+  reproduzirSomExpedido(forcar);
 }
 
-function reproduzirSomExpedido() {
-  if (!somExpedidoAtivo || !bufferAudioExpedido || contextoAudioExpedido?.state !== "running") return;
+function reproduzirSomExpedido(forcar = false) {
+  if ((!somExpedidoAtivo && !forcar) || !bufferAudioExpedido || !contextoAudioExpedido) return false;
 
-  const fonte = contextoAudioExpedido.createBufferSource();
-  fonte.buffer = bufferAudioExpedido;
-  fonte.connect(contextoAudioExpedido.destination);
-  fonte.start();
-}
+  if (contextoAudioExpedido.state === "suspended") {
+    void contextoAudioExpedido.resume().catch((error) => {
+      console.error("O navegador bloqueou a reprodução do áudio:", error);
+    });
+  }
+  if (contextoAudioExpedido.state === "closed") return false;
 
-btnAtivarSom.addEventListener("click", async () => {
-  btnAtivarSom.disabled = true;
   try {
-    if (somExpedidoAtivo) {
-      somExpedidoAtivo = false;
-      await contextoAudioExpedido.suspend();
-      atualizarBotaoSomExpedido();
-      mostrarToast("Avisos sonoros desativados.", "aviso");
+    const fonte = contextoAudioExpedido.createBufferSource();
+    fonte.buffer = bufferAudioExpedido;
+    fonte.connect(contextoAudioExpedido.destination);
+    fonte.start();
+    return true;
+  } catch (error) {
+    console.error("O navegador não conseguiu iniciar o áudio:", error);
+    return false;
+  }
+}
+
+async function enviarBroadcastExpedicao(evento, payload) {
+  if (!canalExpedicaoRealtime) {
+    throw new Error("O canal de atualizações em tempo real não está conectado.");
+  }
+
+  const status = await canalExpedicaoRealtime.send({
+    type: "broadcast",
+    event: evento,
+    payload
+  });
+  if (status !== "ok") {
+    throw new Error(`O Realtime recusou o evento (${status}).`);
+  }
+}
+
+async function alternarPreferenciaSomExpedido() {
+  const somAtivo = !somExpedidoAtivo;
+  try {
+    const { error } = await banco
+      .from("perfis")
+      .update({ som_ativado: somAtivo })
+      .eq("id", perfilAtual.id);
+    if (error) throw error;
+
+    perfilAtual.som_ativado = somAtivo;
+    somExpedidoAtivo = somAtivo;
+    atualizarBotaoSomExpedido();
+
+    try {
+      await enviarBroadcastExpedicao("preferencia-som", {
+        tipo: "preferencia-som",
+        usuarioId: perfilAtual.id,
+        ativo: somAtivo
+      });
+    } catch (error) {
+      console.error("A preferência foi salva, mas não sincronizou com os outros dispositivos:", error);
+      mostrarToast("Preferência salva, mas não foi possível atualizar os outros dispositivos.", "erro");
       return;
     }
 
-    await prepararSomExpedido();
-    if (contextoAudioExpedido.state !== "running") {
-      throw new Error("O navegador manteve o áudio suspenso.");
+    if (somAtivo) {
+      try {
+        await prepararSomExpedido();
+      } catch (error) {
+        console.error("Preferência salva, mas o áudio não pôde ser preparado neste dispositivo:", error);
+        mostrarToast("Som ativado; interaja com a página para permitir a reprodução.", "aviso");
+        return;
+      }
     }
 
-    somExpedidoAtivo = true;
-    atualizarBotaoSomExpedido();
-    tocarSomExpedido();
-    mostrarToast("Avisos sonoros ativados.", "sucesso");
+    mostrarToast(
+      somAtivo ? "Avisos sonoros ativados em seus dispositivos." : "Avisos sonoros desativados em seus dispositivos.",
+      "sucesso"
+    );
   } catch (error) {
-    console.error("Não foi possível ativar o som de expedição:", error);
-    somExpedidoAtivo = false;
-    atualizarBotaoSomExpedido();
-    mostrarToast("Não foi possível ativar o som. Tente novamente neste botão.", "erro");
-  } finally {
-    btnAtivarSom.disabled = false;
+    console.error("Não foi possível salvar a preferência de som:", error);
+    mostrarToast("Não foi possível salvar a preferência de som.", "erro");
   }
+}
+
+async function dispararAlertaSonoro(tocouLocalmente, preparacaoAudio) {
+  if (!tocouLocalmente) {
+    try {
+      await preparacaoAudio;
+      tocouLocalmente = tocarSomExpedido(true);
+    } catch (error) {
+      console.error("O alerta não pôde tocar neste dispositivo:", error);
+    }
+  }
+
+  try {
+    await enviarBroadcastExpedicao("alerta-sonoro", { tipo: "alerta-sonoro" });
+  } catch (error) {
+    console.error("Não foi possível enviar o alerta sonoro:", error);
+    mostrarToast("Não foi possível enviar o alerta. Verifique a conexão em tempo real.", "erro");
+    return;
+  }
+
+  mostrarToast(
+    !tocouLocalmente
+      ? "Alerta enviado; o navegador não permitiu tocar o som neste dispositivo."
+      : "Alerta sonoro enviado aos usuários conectados da filial.",
+    !tocouLocalmente ? "aviso" : "sucesso"
+  );
+}
+
+btnAtivarSom.addEventListener("click", () => {
+  if (temporizadorCliqueSino !== null) return;
+  const tocouLocalmente = tocarSomExpedido(true);
+  const preparacaoAudio = carregarSomExpedido();
+  preparacaoAudio.catch((error) => {
+    console.error("Não foi possível preparar o som do alerta:", error);
+  });
+  temporizadorCliqueSino = window.setTimeout(() => {
+    temporizadorCliqueSino = null;
+    void dispararAlertaSonoro(tocouLocalmente, preparacaoAudio);
+  }, 500);
+});
+
+btnAtivarSom.addEventListener("dblclick", (evento) => {
+  evento.preventDefault();
+  if (temporizadorCliqueSino !== null) {
+    window.clearTimeout(temporizadorCliqueSino);
+    temporizadorCliqueSino = null;
+  }
+  void alternarPreferenciaSomExpedido();
+});
+
+document.addEventListener("pointerdown", () => {
+  if (!somExpedidoAtivo || contextoAudioExpedido?.state === "running") return;
+  void prepararSomExpedido().catch((error) => {
+    console.error("Não foi possível preparar o áudio neste dispositivo:", error);
+  });
 });
 
 function obterPayloadRealtime(payload) {
@@ -895,6 +1006,21 @@ function obterPayloadRealtime(payload) {
 }
 
 async function aplicarAlteracaoRealtime(alteracao) {
+  if (alteracao?.tipo === "alerta-sonoro") {
+    tocarSomExpedido();
+    return;
+  }
+
+  if (
+    alteracao?.tipo === "preferencia-som" &&
+    alteracao.usuarioId === perfilAtual?.id
+  ) {
+    somExpedidoAtivo = Boolean(alteracao.ativo);
+    perfilAtual.som_ativado = somExpedidoAtivo;
+    atualizarBotaoSomExpedido();
+    return;
+  }
+
   const { table, operation } = alteracao;
 
   if (table === TABELA_NOTAS) {
@@ -1670,6 +1796,9 @@ async function iniciarSistema(session) {
   carregarEstadoFormulario();
   carregarEstadoListas();
   carregarView();
+  void carregarSomExpedido().catch((error) => {
+    console.error("Não foi possível carregar o som de expedição:", error);
+  });
   await banco.realtime.setAuth(session.access_token);
   await carregarCadastros();
   await carregarNotas();
@@ -1679,6 +1808,8 @@ async function iniciarSistema(session) {
 
 async function iniciarAutenticacao() {
   if (!bancoSupabaseAtivo) {
+    authLoading.hidden = true;
+    loginScreen.hidden = false;
     loginError.textContent = "Configure a conexão do Supabase para habilitar o acesso.";
     loginHelp.textContent = "O acesso está bloqueado até que a autenticação e as políticas de filial estejam configuradas.";
     btnEntrar.disabled = true;
@@ -1692,6 +1823,8 @@ async function iniciarAutenticacao() {
         canalExpedicaoRealtime = null;
       }
       atualizacoesExpedicaoLocais.clear();
+      somExpedidoAtivo = false;
+      atualizarBotaoSomExpedido();
       notas = [];
       clientes = [];
       transportadoras = [];

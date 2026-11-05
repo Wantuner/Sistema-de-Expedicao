@@ -39,6 +39,15 @@ body {
   display: none !important;
 }
 
+.auth-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
 .login-screen {
   display: grid;
   min-height: 100vh;

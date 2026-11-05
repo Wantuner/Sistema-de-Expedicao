@@ -12,7 +12,11 @@
   <script src="vendor/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
-  <main class="login-screen" id="loginScreen">
+  <main class="auth-loading" id="authLoading" role="status" aria-live="polite">
+    Verificando sua sessão...
+  </main>
+
+  <main class="login-screen" id="loginScreen" hidden>
     <form class="login-card" id="loginForm">
       <img class="login-logo" src="./assets/icone-rolimec.png" alt="Logo Rolimec">
       <p class="eyebrow">Central de Expedição</p>
@@ -232,7 +236,7 @@
               </div>
               <div class="panel-heading-actions">
                 <span id="contadorFiltrado" class="panel-chip panel-chip-hidden">0 registros</span>
-                <button id="btnAtivarSom" class="btn btn-secondary" type="button" aria-label="Ativar som" aria-pressed="false">🔕</button>
+                <button id="btnAtivarSom" class="btn btn-secondary" type="button" aria-label="Clique para enviar um alerta. Clique duas vezes para ativar os avisos sonoros." title="Clique: enviar alerta. Duplo clique: ativar avisos sonoros." aria-pressed="false">🔕</button>
                 <button id="btnPDF" class="btn btn-secondary" type="button">Gerar PDF</button>
               </div>
             </div>

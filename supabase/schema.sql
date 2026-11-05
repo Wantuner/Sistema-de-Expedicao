@@ -7,8 +7,12 @@ create table if not exists public.filiais (
 create table if not exists public.perfis (
   id uuid primary key references auth.users (id) on delete cascade,
   filial_id uuid not null references public.filiais (id) on delete restrict,
+  som_ativado boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+alter table public.perfis
+  add column if not exists som_ativado boolean not null default false;
 
 create or replace function public.minha_filial_id()
 returns uuid
@@ -161,6 +165,7 @@ revoke all on all sequences in schema public from anon;
 
 grant usage on schema public to authenticated;
 grant select on public.filiais, public.perfis to authenticated;
+grant update (som_ativado) on public.perfis to authenticated;
 grant select, insert, update, delete on public.clientes, public.transportadoras,
   public.motoristas, public.notas to authenticated;
 grant usage, select on sequence public.clientes_id_seq,
@@ -188,6 +193,14 @@ create policy "Usuario ve seu perfil"
   for select
   to authenticated
   using (id = (select auth.uid()));
+
+drop policy if exists "Usuario atualiza sua preferencia de som" on public.perfis;
+create policy "Usuario atualiza sua preferencia de som"
+  on public.perfis
+  for update
+  to authenticated
+  using (id = (select auth.uid()))
+  with check (id = (select auth.uid()));
 
 drop policy if exists "Acesso da filial a clientes" on public.clientes;
 create policy "Acesso da filial a clientes"
@@ -251,6 +264,27 @@ create policy "Usuarios limitados ao topico da propria filial"
       where perfil.id = (select auth.uid())
         and (select realtime.topic()) = 'filial:' || perfil.filial_id::text
     )
+  );
+
+drop policy if exists "Usuarios enviam alertas para propria filial" on realtime.messages;
+drop policy if exists "Usuarios limitados ao envio na propria filial" on realtime.messages;
+create policy "Usuarios enviam alertas para propria filial"
+  on realtime.messages
+  for insert
+  to authenticated
+  with check (
+    realtime.messages.extension = 'broadcast'
+    and topic = 'filial:' || (select public.minha_filial_id())::text
+  );
+
+create policy "Usuarios limitados ao envio na propria filial"
+  on realtime.messages
+  as restrictive
+  for insert
+  to authenticated
+  with check (
+    realtime.messages.extension = 'broadcast'
+    and topic = 'filial:' || (select public.minha_filial_id())::text
   );
 
 create or replace function public.transmitir_alteracao_filial()
