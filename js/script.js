@@ -340,16 +340,6 @@ function escaparHtml(valor) {
   }[caractere]));
 }
 
-function escaparXml(valor) {
-  return String(valor ?? "").replace(/[&<>"']/g, (caractere) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "\"": "&quot;",
-    "'": "&apos;"
-  }[caractere]));
-}
-
 function formatarNomeArquivo(valor) {
   const nome = String(valor || "").trim().replace(/[\\/:*?"<>|]+/g, "-");
   return nome || "romaneio";
@@ -1585,23 +1575,221 @@ window.gerarRomaneio = async (id) => {
     const documento = zip.file("word/document.xml");
     if (!documento) throw new Error("Documento invalido.");
 
+    const parser = new DOMParser();
+    const xmlDocumento = parser.parseFromString(await documento.async("string"), "application/xml");
+    if (xmlDocumento.getElementsByTagName("parsererror").length) {
+      throw new Error("XML do modelo invalido.");
+    }
+
+    const namespaceWord = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const corpo = xmlDocumento.getElementsByTagNameNS(namespaceWord, "body")[0];
+    if (!corpo) throw new Error("Corpo do documento nao encontrado.");
+
+    const propriedadesSecao = Array.from(corpo.children)
+      .find((elemento) => elemento.namespaceURI === namespaceWord && elemento.localName === "sectPr");
+    const elementosModelo = Array.from(corpo.children)
+      .filter((elemento) => elemento !== propriedadesSecao)
+      .map((elemento) => elemento.cloneNode(true));
+
+    if (!elementosModelo.length) throw new Error("Modelo sem conteudo.");
+
     const substituicoes = [
       nota.nf,
       nota.pedido,
       nota.cliente,
       nota.endereco || "-",
       nota.transportadora || "-"
-    ].map(escaparXml);
+    ];
+    const totalVolumes = Math.max(1, Number(nota.volumes) || 1);
+    const formatarNumeroVolume = (numero) =>
+      `${String(numero).padStart(2, "0")}/${String(totalVolumes).padStart(2, "0")}`;
+    const ordemPropriedades = {
+      pPr: ["pageBreakBefore", "shd", "spacing", "ind", "jc", "rPr"],
+      rPr: ["rFonts", "b", "bCs", "color", "sz", "szCs", "lang"]
+    };
+    const obterPropriedade = (pai, nome) => {
+      let propriedade = Array.from(pai.children)
+        .find((filho) => filho.namespaceURI === namespaceWord && filho.localName === nome);
+      if (!propriedade) {
+        propriedade = xmlDocumento.createElementNS(namespaceWord, `w:${nome}`);
+        const ordem = ordemPropriedades[pai.localName];
+        const indiceNovaPropriedade = ordem ? ordem.indexOf(nome) : -1;
+        const propriedadeSeguinte = ordem && indiceNovaPropriedade >= 0
+          ? Array.from(pai.children).find((filho) => {
+            const indiceExistente = ordem.indexOf(filho.localName);
+            return indiceExistente >= 0 && indiceExistente > indiceNovaPropriedade;
+          })
+          : ["pPr", "rPr"].includes(nome) ? pai.firstChild : null;
+        pai.insertBefore(propriedade, propriedadeSeguinte || null);
+      }
+      return propriedade;
+    };
+    const definirAtributoWord = (elemento, nome, valor) => {
+      elemento.setAttributeNS(namespaceWord, `w:${nome}`, valor);
+    };
+    const estilizarParagrafo = (paragrafo, estilo) => {
+      const propriedades = obterPropriedade(paragrafo, "pPr");
+      const sombreado = obterPropriedade(propriedades, "shd");
+      definirAtributoWord(sombreado, "fill", estilo.fundo);
 
-    let indice = 0;
-    const xmlAtualizado = (await documento.async("string")).replace(/\*{3,}/g, (placeholder) => {
-      if (indice >= substituicoes.length) return placeholder;
-      const valor = substituicoes[indice];
-      indice += 1;
-      return valor;
-    });
+      const alinhamento = obterPropriedade(propriedades, "jc");
+      definirAtributoWord(alinhamento, "val", estilo.alinhamento || "left");
 
-    zip.file("word/document.xml", xmlAtualizado);
+      const espacamento = obterPropriedade(propriedades, "spacing");
+      definirAtributoWord(espacamento, "before", estilo.antes || "100");
+      definirAtributoWord(espacamento, "after", estilo.depois || "100");
+
+      if (estilo.recuo) {
+        const recuo = obterPropriedade(propriedades, "ind");
+        definirAtributoWord(recuo, "left", estilo.recuo);
+        definirAtributoWord(recuo, "right", estilo.recuo);
+        recuo.removeAttributeNS(namespaceWord, "firstLine");
+        recuo.removeAttributeNS(namespaceWord, "firstLineChars");
+      }
+
+      Array.from(paragrafo.getElementsByTagNameNS(namespaceWord, "r")).forEach((trecho) => {
+        const propriedadesTrecho = obterPropriedade(trecho, "rPr");
+        const fontes = obterPropriedade(propriedadesTrecho, "rFonts");
+        ["ascii", "hAnsi", "cs", "eastAsia"].forEach((atributo) => {
+          definirAtributoWord(fontes, atributo, "Arial");
+        });
+
+        const cor = obterPropriedade(propriedadesTrecho, "color");
+        definirAtributoWord(cor, "val", estilo.cor);
+
+        const tamanho = obterPropriedade(propriedadesTrecho, "sz");
+        definirAtributoWord(tamanho, "val", estilo.tamanho);
+
+        const negrito = obterPropriedade(propriedadesTrecho, "b");
+        if (estilo.negrito) {
+          negrito.removeAttributeNS(namespaceWord, "val");
+        } else {
+          definirAtributoWord(negrito, "val", "0");
+        }
+
+        const negritoComplexo = obterPropriedade(propriedadesTrecho, "bCs");
+        if (estilo.negrito) {
+          negritoComplexo.removeAttributeNS(namespaceWord, "val");
+        } else {
+          definirAtributoWord(negritoComplexo, "val", "0");
+        }
+      });
+    };
+    const estilizarPagina = (elementosPagina) => {
+      let aguardaValor = false;
+
+      elementosPagina.forEach((elemento) => {
+        if (elemento.namespaceURI !== namespaceWord || elemento.localName !== "p") return;
+
+        const trechos = Array.from(elemento.getElementsByTagNameNS(namespaceWord, "t"));
+        let texto = trechos.map((trecho) => trecho.textContent).join("");
+        if (!texto.trim()) return;
+
+        if (texto.startsWith("REMENTENTE:")) {
+          trechos.forEach((trecho) => {
+            trecho.textContent = trecho.textContent.replace("REMENTENTE:", "REMETENTE:");
+          });
+          texto = texto.replace("REMENTENTE:", "REMETENTE:");
+        }
+
+        if (texto.startsWith("NOTA:")) {
+          estilizarParagrafo(elemento, {
+            fundo: "29413B",
+            cor: "FFFFFF",
+            tamanho: "28",
+            negrito: true,
+            alinhamento: "left",
+            recuo: "140",
+            antes: "160",
+            depois: "160"
+          });
+          aguardaValor = false;
+          return;
+        }
+
+        if (texto.startsWith("N° VOLUME:")) {
+          estilizarParagrafo(elemento, {
+            fundo: "D9FF63",
+            cor: "293C36",
+            tamanho: "40",
+            negrito: true,
+            alinhamento: "center",
+            antes: "180",
+            depois: "180"
+          });
+          aguardaValor = false;
+          return;
+        }
+
+        if (/^(REMETENTE|DESTINATÁRIO|ENDEREÇO|TRANSPORTADORA):/.test(texto)) {
+          estilizarParagrafo(elemento, {
+            fundo: "E8F0EC",
+            cor: "426D67",
+            tamanho: "22",
+            negrito: true,
+            recuo: "140",
+            antes: "100",
+            depois: "40"
+          });
+          aguardaValor = true;
+          return;
+        }
+
+        if (aguardaValor) {
+          estilizarParagrafo(elemento, {
+            fundo: "F7F8F4",
+            cor: "29231C",
+            tamanho: "24",
+            negrito: false,
+            recuo: "140",
+            antes: "40",
+            depois: "100"
+          });
+          aguardaValor = false;
+        }
+      });
+    };
+
+    while (corpo.firstChild) corpo.removeChild(corpo.firstChild);
+    for (let indiceVolume = 1; indiceVolume <= totalVolumes; indiceVolume += 1) {
+      const elementosPagina = elementosModelo.map((elemento) => elemento.cloneNode(true));
+      const textos = elementosPagina.flatMap((elemento) =>
+        Array.from(elemento.getElementsByTagNameNS(namespaceWord, "t"))
+      );
+      let indiceSubstituicao = 0;
+
+      textos.forEach((texto) => {
+        texto.textContent = texto.textContent.replace(/\*{3,}/g, () => {
+          if (indiceSubstituicao >= substituicoes.length) {
+            throw new Error("Modelo possui marcadores inesperados.");
+          }
+          return String(substituicoes[indiceSubstituicao++]);
+        });
+
+        if (texto.textContent.includes("01/01")) {
+          texto.textContent = texto.textContent.replace("01/01", formatarNumeroVolume(indiceVolume));
+        }
+      });
+
+      if (indiceSubstituicao !== substituicoes.length) {
+        throw new Error("Modelo nao possui todos os marcadores esperados.");
+      }
+
+      estilizarPagina(elementosPagina);
+      if (indiceVolume > 1) {
+        const primeiroParagrafo = elementosPagina.find((elemento) =>
+          elemento.namespaceURI === namespaceWord && elemento.localName === "p"
+        );
+        if (!primeiroParagrafo) throw new Error("Inicio da pagina do modelo nao encontrado.");
+        const propriedades = obterPropriedade(primeiroParagrafo, "pPr");
+        obterPropriedade(propriedades, "pageBreakBefore");
+      }
+
+      elementosPagina.forEach((elemento) => corpo.appendChild(elemento));
+    }
+    if (propriedadesSecao) corpo.appendChild(propriedadesSecao.cloneNode(true));
+
+    zip.file("word/document.xml", new XMLSerializer().serializeToString(xmlDocumento));
 
     const blob = await zip.generateAsync({
       type: "blob",
@@ -1616,7 +1804,12 @@ window.gerarRomaneio = async (id) => {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    mostrarToast("Romaneio gerado com sucesso.", "sucesso");
+    mostrarToast(
+      totalVolumes === 1
+        ? "Romaneio gerado com sucesso."
+        : `${totalVolumes} romaneios gerados em um arquivo Word.`,
+      "sucesso"
+    );
   } catch (error) {
     console.error("Erro ao gerar romaneio:", error);
     mostrarToast("Nao foi possivel gerar o romaneio.", "erro");
