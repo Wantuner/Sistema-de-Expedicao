@@ -1583,133 +1583,249 @@ window.gerarRomaneio = async (id) => {
     }
 
     const namespaceWord = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const namespaceDrawing = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+    const namespaceDrawingMl = "http://schemas.openxmlformats.org/drawingml/2006/main";
     const corpo = xmlDocumento.getElementsByTagNameNS(namespaceWord, "body")[0];
     if (!corpo) throw new Error("Corpo do documento nao encontrado.");
 
     const propriedadesSecao = Array.from(corpo.children)
       .find((elemento) => elemento.namespaceURI === namespaceWord && elemento.localName === "sectPr");
-    const elementosModelo = Array.from(corpo.children)
-      .filter((elemento) => elemento !== propriedadesSecao)
-      .map((elemento) => elemento.cloneNode(true));
+    const margensSecao = propriedadesSecao
+      && propriedadesSecao.getElementsByTagNameNS(namespaceWord, "pgMar")[0];
+    if (!margensSecao) throw new Error("Margens da pagina nao encontradas no modelo.");
+    [["top", "600"], ["right", "500"], ["bottom", "600"], ["left", "500"]]
+      .forEach(([lado, valor]) => margensSecao.setAttributeNS(namespaceWord, `w:${lado}`, valor));
 
-    if (!elementosModelo.length) throw new Error("Modelo sem conteudo.");
+    const paragrafoLogo = Array.from(corpo.children).find((elemento) =>
+      elemento.namespaceURI === namespaceWord
+      && elemento.localName === "p"
+      && elemento.getElementsByTagNameNS(namespaceWord, "drawing").length
+    );
+    if (!paragrafoLogo) throw new Error("Logotipo nao encontrado no modelo.");
 
-    const substituicoes = [
-      nota.nf,
-      nota.pedido,
-      nota.cliente,
-      nota.endereco || "-",
-      nota.transportadora || "-"
-    ];
     const totalVolumes = Math.max(1, Number(nota.volumes) || 1);
     const formatarNumeroVolume = (numero) =>
       `${String(numero).padStart(2, "0")}/${String(totalVolumes).padStart(2, "0")}`;
-    const ordemPropriedades = {
-      pPr: ["pageBreakBefore", "shd", "spacing", "ind", "jc", "rPr"],
-      rPr: ["rFonts", "b", "bCs", "color", "sz", "szCs", "lang"]
-    };
-    const obterPropriedade = (pai, nome) => {
-      let propriedade = Array.from(pai.children)
-        .find((filho) => filho.namespaceURI === namespaceWord && filho.localName === nome);
-      if (!propriedade) {
-        propriedade = xmlDocumento.createElementNS(namespaceWord, `w:${nome}`);
-        const ordem = ordemPropriedades[pai.localName];
-        const indiceNovaPropriedade = ordem ? ordem.indexOf(nome) : -1;
-        const propriedadeSeguinte = ordem && indiceNovaPropriedade >= 0
-          ? Array.from(pai.children).find((filho) => {
-            const indiceExistente = ordem.indexOf(filho.localName);
-            return indiceExistente >= 0 && indiceExistente > indiceNovaPropriedade;
-          })
-          : ["pPr", "rPr"].includes(nome) ? pai.firstChild : null;
-        pai.insertBefore(propriedade, propriedadeSeguinte || null);
-      }
-      return propriedade;
-    };
-    const definirAtributoWord = (elemento, nome, valor) => {
-      elemento.setAttributeNS(namespaceWord, `w:${nome}`, valor);
+    const definirAtributoWord = (elemento, nome, valor) =>
+      elemento.setAttributeNS(namespaceWord, `w:${nome}`, String(valor));
+    const criarElementoWord = (nome) => xmlDocumento.createElementNS(namespaceWord, `w:${nome}`);
+    const criarParagrafo = (texto, estilo) => {
+      const paragrafo = criarElementoWord("p");
+      const trecho = criarElementoWord("r");
+      const conteudo = criarElementoWord("t");
+      conteudo.textContent = texto;
+      trecho.appendChild(conteudo);
+      paragrafo.appendChild(trecho);
+      estilizarParagrafo(paragrafo, estilo);
+      return paragrafo;
     };
     const estilizarParagrafo = (paragrafo, estilo) => {
-      const propriedades = obterPropriedade(paragrafo, "pPr");
-      const sombreado = obterPropriedade(propriedades, "shd");
-      definirAtributoWord(sombreado, "fill", estilo.fundo);
+      const propriedades = criarElementoWord("pPr");
+      const sombreado = criarElementoWord("shd");
+      definirAtributoWord(sombreado, "fill", estilo.fundo || "FFFFFF");
+      propriedades.appendChild(sombreado);
 
-      const alinhamento = obterPropriedade(propriedades, "jc");
-      definirAtributoWord(alinhamento, "val", estilo.alinhamento || "left");
-
-      const espacamento = obterPropriedade(propriedades, "spacing");
-      definirAtributoWord(espacamento, "before", estilo.antes || "100");
-      definirAtributoWord(espacamento, "after", estilo.depois || "100");
+      const espacamento = criarElementoWord("spacing");
+      definirAtributoWord(espacamento, "before", estilo.antes || "60");
+      definirAtributoWord(espacamento, "after", estilo.depois || "60");
+      propriedades.appendChild(espacamento);
 
       if (estilo.recuo) {
-        const recuo = obterPropriedade(propriedades, "ind");
+        const recuo = criarElementoWord("ind");
         definirAtributoWord(recuo, "left", estilo.recuo);
         definirAtributoWord(recuo, "right", estilo.recuo);
-        recuo.removeAttributeNS(namespaceWord, "firstLine");
-        recuo.removeAttributeNS(namespaceWord, "firstLineChars");
+        propriedades.appendChild(recuo);
       }
 
+      const alinhamento = criarElementoWord("jc");
+      definirAtributoWord(alinhamento, "val", estilo.alinhamento || "left");
+      propriedades.appendChild(alinhamento);
+      paragrafo.insertBefore(propriedades, paragrafo.firstChild);
+
       Array.from(paragrafo.getElementsByTagNameNS(namespaceWord, "r")).forEach((trecho) => {
-        const propriedadesTrecho = obterPropriedade(trecho, "rPr");
-        const fontes = obterPropriedade(propriedadesTrecho, "rFonts");
+        const propriedadesTrecho = criarElementoWord("rPr");
+        const fontes = criarElementoWord("rFonts");
         ["ascii", "hAnsi", "cs", "eastAsia"].forEach((atributo) => {
           definirAtributoWord(fontes, atributo, "Arial");
         });
+        propriedadesTrecho.appendChild(fontes);
 
-        const cor = obterPropriedade(propriedadesTrecho, "color");
-        definirAtributoWord(cor, "val", estilo.cor);
+        if (estilo.negrito) propriedadesTrecho.appendChild(criarElementoWord("b"));
 
-        const tamanho = obterPropriedade(propriedadesTrecho, "sz");
-        definirAtributoWord(tamanho, "val", estilo.tamanho);
+        const cor = criarElementoWord("color");
+        definirAtributoWord(cor, "val", estilo.cor || "29231C");
+        propriedadesTrecho.appendChild(cor);
 
-        const negrito = obterPropriedade(propriedadesTrecho, "b");
-        if (estilo.negrito) {
-          negrito.removeAttributeNS(namespaceWord, "val");
-        } else {
-          definirAtributoWord(negrito, "val", "0");
-        }
-
-        const negritoComplexo = obterPropriedade(propriedadesTrecho, "bCs");
-        if (estilo.negrito) {
-          negritoComplexo.removeAttributeNS(namespaceWord, "val");
-        } else {
-          definirAtributoWord(negritoComplexo, "val", "0");
-        }
+        const tamanho = criarElementoWord("sz");
+        definirAtributoWord(tamanho, "val", estilo.tamanho || "22");
+        propriedadesTrecho.appendChild(tamanho);
+        trecho.insertBefore(propriedadesTrecho, trecho.firstChild);
       });
     };
-    const estilizarPagina = (elementosPagina) => {
-      let aguardaValor = false;
+    const estiloRotulo = {
+      fundo: "E8F0EC",
+      cor: "426D67",
+      tamanho: "18",
+      negrito: true,
+      antes: "80",
+      depois: "20",
+      recuo: "120"
+    };
+    const estiloValor = {
+      fundo: "FFFFFF",
+      cor: "29231C",
+      tamanho: "26",
+      antes: "20",
+      depois: "100",
+      recuo: "120"
+    };
+    const criarCelula = (largura, paragrafos, preenchimento = "FFFFFF", mesclar = false) => {
+      const celula = criarElementoWord("tc");
+      const propriedades = criarElementoWord("tcPr");
+      const larguraCelula = criarElementoWord("tcW");
+      definirAtributoWord(larguraCelula, "w", largura);
+      definirAtributoWord(larguraCelula, "type", "dxa");
+      propriedades.appendChild(larguraCelula);
 
-      elementosPagina.forEach((elemento) => {
-        if (elemento.namespaceURI !== namespaceWord || elemento.localName !== "p") return;
+      if (mesclar) {
+        const mesclagem = criarElementoWord("gridSpan");
+        definirAtributoWord(mesclagem, "val", "2");
+        propriedades.appendChild(mesclagem);
+      }
 
-        const trechos = Array.from(elemento.getElementsByTagNameNS(namespaceWord, "t"));
-        let texto = trechos.map((trecho) => trecho.textContent).join("");
-        if (!texto.trim()) return;
+      const sombreado = criarElementoWord("shd");
+      definirAtributoWord(sombreado, "fill", preenchimento);
+      propriedades.appendChild(sombreado);
+      celula.appendChild(propriedades);
+      paragrafos.forEach((paragrafo) => celula.appendChild(paragrafo));
+      return celula;
+    };
+    const criarLinha = (celulas) => {
+      const linha = criarElementoWord("tr");
+      const propriedades = criarElementoWord("trPr");
+      propriedades.appendChild(criarElementoWord("cantSplit"));
+      linha.appendChild(propriedades);
+      celulas.forEach((celula) => linha.appendChild(celula));
+      return linha;
+    };
+    const criarTabelaRomaneio = (indiceVolume) => {
+      const larguraTabela = 10906;
+      const larguraColunaLogo = 3200;
+      const larguraColunaDados = larguraTabela - larguraColunaLogo;
+      const tabela = criarElementoWord("tbl");
+      const propriedades = criarElementoWord("tblPr");
+      const larguraPropriedade = criarElementoWord("tblW");
+      definirAtributoWord(larguraPropriedade, "w", larguraTabela);
+      definirAtributoWord(larguraPropriedade, "type", "dxa");
+      propriedades.appendChild(larguraPropriedade);
 
-        if (texto.startsWith("REMENTENTE:")) {
-          trechos.forEach((trecho) => {
-            trecho.textContent = trecho.textContent.replace("REMENTENTE:", "REMETENTE:");
-          });
-          texto = texto.replace("REMENTENTE:", "REMETENTE:");
-        }
+      const alinhamentoTabela = criarElementoWord("jc");
+      definirAtributoWord(alinhamentoTabela, "val", "center");
+      propriedades.appendChild(alinhamentoTabela);
 
-        if (texto.startsWith("NOTA:")) {
-          estilizarParagrafo(elemento, {
+      const bordas = criarElementoWord("tblBorders");
+      ["top", "left", "bottom", "right", "insideH", "insideV"].forEach((lado) => {
+        const borda = criarElementoWord(lado);
+        definirAtributoWord(borda, "val", "single");
+        definirAtributoWord(borda, "sz", "12");
+        definirAtributoWord(borda, "space", "0");
+        definirAtributoWord(borda, "color", "29413B");
+        bordas.appendChild(borda);
+      });
+      propriedades.appendChild(bordas);
+
+      const layout = criarElementoWord("tblLayout");
+      definirAtributoWord(layout, "type", "fixed");
+      propriedades.appendChild(layout);
+
+      const margens = criarElementoWord("tblCellMar");
+      [["top", "100"], ["left", "140"], ["bottom", "100"], ["right", "140"]]
+        .forEach(([lado, valor]) => {
+          const margem = criarElementoWord(lado);
+          definirAtributoWord(margem, "w", valor);
+          definirAtributoWord(margem, "type", "dxa");
+          margens.appendChild(margem);
+        });
+      propriedades.appendChild(margens);
+      tabela.appendChild(propriedades);
+
+      const grade = criarElementoWord("tblGrid");
+      [larguraColunaLogo, larguraColunaDados].forEach((largura) => {
+        const coluna = criarElementoWord("gridCol");
+        definirAtributoWord(coluna, "w", largura);
+        grade.appendChild(coluna);
+      });
+      tabela.appendChild(grade);
+
+      const paragrafoLogoVolume = paragrafoLogo.cloneNode(true);
+      const propriedadesImagem = paragrafoLogoVolume.getElementsByTagNameNS(namespaceDrawing, "docPr");
+      if (propriedadesImagem.length) {
+        propriedadesImagem[0].setAttribute("id", String(indiceVolume));
+      }
+      const celulaLogo = criarCelula(larguraColunaLogo, [paragrafoLogoVolume]);
+      const extents = celulaLogo.getElementsByTagNameNS(namespaceDrawing, "extent");
+      if (!extents.length) throw new Error("Dimensoes do logotipo nao encontradas.");
+      const larguraLogo = 1500000;
+      const alturaLogo = Math.round(larguraLogo * 1323975 / 2190750);
+      extents[0].setAttribute("cx", String(larguraLogo));
+      extents[0].setAttribute("cy", String(alturaLogo));
+      const extentsImagem = celulaLogo.getElementsByTagNameNS(namespaceDrawingMl, "ext");
+      if (extentsImagem.length) {
+        extentsImagem[0].setAttribute("cx", String(larguraLogo));
+        extentsImagem[0].setAttribute("cy", String(alturaLogo));
+      }
+
+      const celulaRemetente = criarCelula(larguraColunaDados, [
+        criarParagrafo("REMETENTE", estiloRotulo),
+        criarParagrafo("ROLIMEC ROLAMENTOS LTDA", { ...estiloValor, negrito: true }),
+        criarParagrafo("ENDEREÇO", estiloRotulo),
+        criarParagrafo(ENDERECO_REMETENTE, { ...estiloValor, tamanho: "21" })
+      ]);
+      tabela.appendChild(criarLinha([celulaLogo, celulaRemetente]));
+
+      tabela.appendChild(criarLinha([
+        criarCelula(larguraTabela, [
+          criarParagrafo("ROMANEIO DE EXPEDIÇÃO", {
             fundo: "29413B",
             cor: "FFFFFF",
-            tamanho: "28",
+            tamanho: "30",
             negrito: true,
-            alinhamento: "left",
-            recuo: "140",
-            antes: "160",
-            depois: "160"
-          });
-          aguardaValor = false;
-          return;
-        }
+            alinhamento: "center",
+            antes: "140",
+            depois: "140"
+          })
+        ], "29413B", true)
+      ]));
 
-        if (texto.startsWith("N° VOLUME:")) {
-          estilizarParagrafo(elemento, {
+      tabela.appendChild(criarLinha([
+        criarCelula(larguraTabela, [
+          criarParagrafo("DESTINATÁRIO", estiloRotulo),
+          criarParagrafo(String(nota.cliente || "-"), { ...estiloValor, tamanho: "30", negrito: true }),
+          criarParagrafo(String(nota.endereco || "-"), { ...estiloValor, tamanho: "22" })
+        ], "FFFFFF", true)
+      ]));
+
+      tabela.appendChild(criarLinha([
+        criarCelula(larguraColunaLogo, [
+          criarParagrafo("NOTA FISCAL", estiloRotulo),
+          criarParagrafo(String(nota.nf || "-"), { ...estiloValor, tamanho: "34", negrito: true })
+        ]),
+        criarCelula(larguraColunaDados, [
+          criarParagrafo("PEDIDO", estiloRotulo),
+          criarParagrafo(String(nota.pedido || "-"), { ...estiloValor, tamanho: "28", negrito: true })
+        ])
+      ]));
+
+      tabela.appendChild(criarLinha([
+        criarCelula(larguraTabela, [
+          criarParagrafo("TRANSPORTADORA", estiloRotulo),
+          criarParagrafo(String(nota.transportadora || "-"), { ...estiloValor, negrito: true })
+        ], "FFFFFF", true)
+      ]));
+
+      tabela.appendChild(criarLinha([
+        criarCelula(larguraTabela, [
+          criarParagrafo(`N° VOLUME: ${formatarNumeroVolume(indiceVolume)}`, {
             fundo: "D9FF63",
             cor: "293C36",
             tamanho: "40",
@@ -1717,126 +1833,25 @@ window.gerarRomaneio = async (id) => {
             alinhamento: "center",
             antes: "180",
             depois: "180"
-          });
-          aguardaValor = false;
-          return;
-        }
+          })
+        ], "D9FF63", true)
+      ]));
 
-        if (/^(REMETENTE|DESTINATÁRIO|ENDEREÇO|TRANSPORTADORA):/.test(texto)) {
-          estilizarParagrafo(elemento, {
-            fundo: "E8F0EC",
-            cor: "426D67",
-            tamanho: "22",
-            negrito: true,
-            recuo: "140",
-            antes: "100",
-            depois: "40"
-          });
-          aguardaValor = true;
-          return;
-        }
-
-        if (aguardaValor) {
-          estilizarParagrafo(elemento, {
-            fundo: "F7F8F4",
-            cor: "29231C",
-            tamanho: "24",
-            negrito: false,
-            recuo: "140",
-            antes: "40",
-            depois: "100"
-          });
-          aguardaValor = false;
-        }
-      });
-    };
-    const obterTextoParagrafo = (paragrafo) =>
-      Array.from(paragrafo.getElementsByTagNameNS(namespaceWord, "t"))
-        .map((trecho) => trecho.textContent)
-        .join("");
-    const definirTextoParagrafo = (paragrafo, texto) => {
-      const trechos = Array.from(paragrafo.getElementsByTagNameNS(namespaceWord, "t"));
-      if (!trechos.length) throw new Error("Paragrafo do modelo sem trecho de texto.");
-      trechos.forEach((trecho, indice) => {
-        trecho.textContent = indice === 0 ? texto : "";
-      });
+      return tabela;
     };
 
     while (corpo.firstChild) corpo.removeChild(corpo.firstChild);
     for (let indiceVolume = 1; indiceVolume <= totalVolumes; indiceVolume += 1) {
-      const elementosPagina = elementosModelo.map((elemento) => elemento.cloneNode(true));
-      const textos = elementosPagina.flatMap((elemento) =>
-        Array.from(elemento.getElementsByTagNameNS(namespaceWord, "t"))
-      );
-      let indiceSubstituicao = 0;
-
-      textos.forEach((texto) => {
-        texto.textContent = texto.textContent.replace(/\*{3,}/g, () => {
-          if (indiceSubstituicao >= substituicoes.length) {
-            throw new Error("Modelo possui marcadores inesperados.");
-          }
-          return String(substituicoes[indiceSubstituicao++]);
-        });
-
-        if (texto.textContent.includes("01/01")) {
-          texto.textContent = texto.textContent.replace("01/01", formatarNumeroVolume(indiceVolume));
-        }
-      });
-
-      if (indiceSubstituicao !== substituicoes.length) {
-        throw new Error("Modelo nao possui todos os marcadores esperados.");
-      }
-
-      const indiceRotuloRemetente = elementosPagina.findIndex((elemento) =>
-        elemento.namespaceURI === namespaceWord
-        && elemento.localName === "p"
-        && /^(REMETENTE|REMENTENTE):/.test(obterTextoParagrafo(elemento))
-      );
-      const indiceRotuloDestinatario = elementosPagina.findIndex((elemento) =>
-        elemento.namespaceURI === namespaceWord
-        && elemento.localName === "p"
-        && obterTextoParagrafo(elemento).startsWith("DESTINATÁRIO:")
-      );
-      const paragrafoValorRemetente = elementosPagina
-        .slice(indiceRotuloRemetente + 1, indiceRotuloDestinatario)
-        .find((elemento) =>
-          elemento.namespaceURI === namespaceWord
-          && elemento.localName === "p"
-          && obterTextoParagrafo(elemento).trim()
-        );
-      if (indiceRotuloRemetente < 0 || indiceRotuloDestinatario < 0 || !paragrafoValorRemetente) {
-        throw new Error("Campos do remetente ou destinatario nao encontrados no modelo.");
-      }
-
-      const paragrafoEnderecoRotulo = elementosPagina[indiceRotuloRemetente].cloneNode(true);
-      const paragrafoEnderecoValor = paragrafoValorRemetente.cloneNode(true);
-      definirTextoParagrafo(paragrafoEnderecoRotulo, "ENDEREÇO:");
-      definirTextoParagrafo(paragrafoEnderecoValor, ENDERECO_REMETENTE);
-      const indiceValorRemetente = elementosPagina.indexOf(paragrafoValorRemetente);
-      const indiceDestinatarioAtual = elementosPagina.indexOf(elementosPagina[indiceRotuloDestinatario]);
-      for (let indice = indiceDestinatarioAtual - 1; indice > indiceValorRemetente; indice -= 1) {
-        const elemento = elementosPagina[indice];
-        if (
-          elemento.namespaceURI === namespaceWord
-          && elemento.localName === "p"
-          && !obterTextoParagrafo(elemento).trim()
-        ) {
-          elementosPagina.splice(indice, 1);
-        }
-      }
-      elementosPagina.splice(indiceValorRemetente + 1, 0, paragrafoEnderecoRotulo, paragrafoEnderecoValor);
-
-      estilizarPagina(elementosPagina);
       if (indiceVolume > 1) {
-        const primeiroParagrafo = elementosPagina.find((elemento) =>
-          elemento.namespaceURI === namespaceWord && elemento.localName === "p"
-        );
-        if (!primeiroParagrafo) throw new Error("Inicio da pagina do modelo nao encontrado.");
-        const propriedades = obterPropriedade(primeiroParagrafo, "pPr");
-        obterPropriedade(propriedades, "pageBreakBefore");
+        const paragrafoQuebra = criarElementoWord("p");
+        const trechoQuebra = criarElementoWord("r");
+        const quebra = criarElementoWord("br");
+        definirAtributoWord(quebra, "type", "page");
+        trechoQuebra.appendChild(quebra);
+        paragrafoQuebra.appendChild(trechoQuebra);
+        corpo.appendChild(paragrafoQuebra);
       }
-
-      elementosPagina.forEach((elemento) => corpo.appendChild(elemento));
+      corpo.appendChild(criarTabelaRomaneio(indiceVolume));
     }
     if (propriedadesSecao) corpo.appendChild(propriedadesSecao.cloneNode(true));
 
