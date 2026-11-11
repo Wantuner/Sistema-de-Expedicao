@@ -78,6 +78,7 @@ const TRANSPORTADORAS_VISIBLE_KEY = "expedicao.transportadorasVisible";
 const MOTORISTAS_VISIBLE_KEY = "expedicao.motoristasVisible";
 const TABELA_NOTAS = "notas";
 const MODELO_ROMANEIO_PATH = "assets/Modelo.docx";
+const ENDERECO_REMETENTE = "R SAO SEBASTIAO - 32A - JARDIM BANDEIRANTES - MARACANAU - CE";
 
 const supabaseConfig = window.SUPABASE_CONFIG || {};
 const supabaseUrl = String(supabaseConfig.url || "").trim();
@@ -1749,6 +1750,17 @@ window.gerarRomaneio = async (id) => {
         }
       });
     };
+    const obterTextoParagrafo = (paragrafo) =>
+      Array.from(paragrafo.getElementsByTagNameNS(namespaceWord, "t"))
+        .map((trecho) => trecho.textContent)
+        .join("");
+    const definirTextoParagrafo = (paragrafo, texto) => {
+      const trechos = Array.from(paragrafo.getElementsByTagNameNS(namespaceWord, "t"));
+      if (!trechos.length) throw new Error("Paragrafo do modelo sem trecho de texto.");
+      trechos.forEach((trecho, indice) => {
+        trecho.textContent = indice === 0 ? texto : "";
+      });
+    };
 
     while (corpo.firstChild) corpo.removeChild(corpo.firstChild);
     for (let indiceVolume = 1; indiceVolume <= totalVolumes; indiceVolume += 1) {
@@ -1774,6 +1786,45 @@ window.gerarRomaneio = async (id) => {
       if (indiceSubstituicao !== substituicoes.length) {
         throw new Error("Modelo nao possui todos os marcadores esperados.");
       }
+
+      const indiceRotuloRemetente = elementosPagina.findIndex((elemento) =>
+        elemento.namespaceURI === namespaceWord
+        && elemento.localName === "p"
+        && /^(REMETENTE|REMENTENTE):/.test(obterTextoParagrafo(elemento))
+      );
+      const indiceRotuloDestinatario = elementosPagina.findIndex((elemento) =>
+        elemento.namespaceURI === namespaceWord
+        && elemento.localName === "p"
+        && obterTextoParagrafo(elemento).startsWith("DESTINATÁRIO:")
+      );
+      const paragrafoValorRemetente = elementosPagina
+        .slice(indiceRotuloRemetente + 1, indiceRotuloDestinatario)
+        .find((elemento) =>
+          elemento.namespaceURI === namespaceWord
+          && elemento.localName === "p"
+          && obterTextoParagrafo(elemento).trim()
+        );
+      if (indiceRotuloRemetente < 0 || indiceRotuloDestinatario < 0 || !paragrafoValorRemetente) {
+        throw new Error("Campos do remetente ou destinatario nao encontrados no modelo.");
+      }
+
+      const paragrafoEnderecoRotulo = elementosPagina[indiceRotuloRemetente].cloneNode(true);
+      const paragrafoEnderecoValor = paragrafoValorRemetente.cloneNode(true);
+      definirTextoParagrafo(paragrafoEnderecoRotulo, "ENDEREÇO:");
+      definirTextoParagrafo(paragrafoEnderecoValor, ENDERECO_REMETENTE);
+      const indiceValorRemetente = elementosPagina.indexOf(paragrafoValorRemetente);
+      const indiceDestinatarioAtual = elementosPagina.indexOf(elementosPagina[indiceRotuloDestinatario]);
+      for (let indice = indiceDestinatarioAtual - 1; indice > indiceValorRemetente; indice -= 1) {
+        const elemento = elementosPagina[indice];
+        if (
+          elemento.namespaceURI === namespaceWord
+          && elemento.localName === "p"
+          && !obterTextoParagrafo(elemento).trim()
+        ) {
+          elementosPagina.splice(indice, 1);
+        }
+      }
+      elementosPagina.splice(indiceValorRemetente + 1, 0, paragrafoEnderecoRotulo, paragrafoEnderecoValor);
 
       estilizarPagina(elementosPagina);
       if (indiceVolume > 1) {
